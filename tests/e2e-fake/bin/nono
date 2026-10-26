@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake nono (a sandbox): runs what it wraps after `run --`.
+[[ $1 == run ]] && shift; [[ $1 == -- ]] && shift; exec "$@"

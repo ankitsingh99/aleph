@@ -1,0 +1,2 @@
+200
+{"backends":["llama-cpp","whisper","piper","stablediffusion"],"loaded_models":[{"id":"phi-3.5-mini-instruct"}]}

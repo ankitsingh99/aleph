@@ -1,0 +1,13 @@
+target/
+*.zip
+.claude/
+tools/logogen/target/
+# screenshots dropped at the top
+/*.png
+/*.PNG
+.DS_Store
+/dist/
+
+# working notes, kept locally, never in the repository (CLAUDE.md stays at the root for Claude Code)
+/notes/
+/CLAUDE.md

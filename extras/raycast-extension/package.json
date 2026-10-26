@@ -1,0 +1,216 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "aleph",
+  "title": "Aleph",
+  "description": "Aleph from Raycast: your coding-agent sessions (Claude Code, Codex, OpenCode, …) inside herdr across your ssh machines. See what needs you, open it in Aleph, reply, approve, queue messages, start sessions, install agents and find local LLM servers.",
+  "icon": "extension-icon.png",
+  "author": "aleph",
+  "license": "MIT",
+  "categories": [
+    "Developer Tools"
+  ],
+  "commands": [
+    {
+      "name": "sessions",
+      "title": "Aleph Sessions",
+      "description": "Every agent session on every machine, grouped by machine: state, folder, task, note, usage limit, live output and queued messages. Open in Aleph, attach in herdr, approve, reply, queue, peek, rename, close.",
+      "mode": "view"
+    },
+    {
+      "name": "start-session",
+      "title": "Aleph Start Session",
+      "description": "Start an agent session (Claude Code, Codex, OpenCode, …) on any machine. An agent that isn't there installs first (asks).",
+      "mode": "view"
+    },
+    {
+      "name": "machines",
+      "title": "Aleph Machines",
+      "description": "Every machine, live: link, CPU / memory / GPU gauges, its sessions, GPUs, cores, trends, agents, disks, processes and LLM servers. Open in Aleph, Quick Start a session there, run the doctor on it.",
+      "mode": "view"
+    },
+    {
+      "name": "presets",
+      "title": "Aleph Presets",
+      "description": "Saved starting points, one session or a tab of them: launch one, or launch it with changes.",
+      "mode": "view"
+    },
+    {
+      "name": "doctor",
+      "title": "Aleph Doctor",
+      "description": "Aleph's checks — this computer, every machine's ssh, login, herdr and agents, the shortcuts — grouped by section, failures first, with their fixes.",
+      "mode": "view"
+    },
+    {
+      "name": "send-message",
+      "title": "Aleph Send Message",
+      "description": "Prompt a running session now, or when it's free, in a while or at a time.",
+      "mode": "view"
+    },
+    {
+      "name": "menu-bar",
+      "title": "Aleph Menu Bar",
+      "description": "How many sessions need you, then who needs you, who's working, the unread Inbox and your machines, with logos. Refreshes every 30 s, or at once through its deeplink.",
+      "mode": "menu-bar",
+      "interval": "30s"
+    },
+    {
+      "name": "notification-settings",
+      "title": "Aleph Notification Settings",
+      "description": "Who tells you, what the menu bar lists, desktop banners, what reaches your phone (ntfy, Moshi, webhooks) and do not disturb: Aleph's own settings.",
+      "mode": "view"
+    },
+    {
+      "name": "usage",
+      "title": "Aleph Usage",
+      "description": "Tokens, time and cost from the agents' own logs on every machine, for any period (24 hours to 6 months, this week or month, your own dates): the cost under the total by account, agent, machine, model or project; this period against the one before; the week's hours; per prompt and per session; the costliest prompts, tools, plans and insights. From the daemon, or aleph usage.",
+      "mode": "view"
+    },
+    {
+      "name": "timeline",
+      "title": "Aleph Timeline",
+      "description": "What each agent did, conversation by conversation: its prompts, turns, tool calls and subagents, with time, tokens and cost, folded the smart way (repeats as \"Read + 7 more\"). Open or fold any of it, see the words (read live, never kept).",
+      "mode": "view"
+    },
+    {
+      "name": "daemon",
+      "title": "Aleph Daemon",
+      "description": "Aleph's daemon at a glance: running or not, uptime, the hub and its service; the machines it watches and what it did today; the HTTP API, Tailscale, Cloudflare and paired devices. Start, stop, restart, install; turn the API on; pair a phone or another computer (a link, a code, a QR code).",
+      "mode": "view"
+    },
+    {
+      "name": "inbox",
+      "title": "Aleph Inbox",
+      "description": "What needs you now, then every machine's events and the sessions you started (the old History), by day: needs you, finished, started, ended, unreachable, auto-approved, tasks, restarts, usage limits. Open in Aleph, reply, approve, queue, start again.",
+      "mode": "view"
+    },
+    {
+      "name": "queue",
+      "title": "Aleph Message Queue",
+      "description": "Messages waiting for a session to be free, or for their time: send now, remove, queue again, add one.",
+      "mode": "view"
+    },
+    {
+      "name": "agents",
+      "title": "Aleph Agents",
+      "description": "Each coding agent across your machines: versions, sessions open now, tokens and cost, plan limits. Install a missing one (asks first).",
+      "mode": "view"
+    },
+    {
+      "name": "llm-servers",
+      "title": "Aleph Local LLM Servers",
+      "description": "Ollama, LM Studio, llama.cpp, vLLM, TGI, LiteLLM, … on every machine: health, models loaded, VRAM, where they answer.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "binaryPath",
+      "title": "Aleph Binary",
+      "description": "The aleph binary: a name, looked up in ~/.cargo/bin, /opt/homebrew/bin, /usr/local/bin, ~/.local/bin and then PATH, or a full path. The old name claude-herdr still works.",
+      "type": "textfield",
+      "required": false,
+      "default": "aleph"
+    },
+    {
+      "name": "openWith",
+      "title": "Open Sessions In",
+      "description": "What opening a session does (↵). Aleph opens it in its Focus view (aleph focus host:name); herdr attaches to it directly. The other one is always the second action (⌘↵).",
+      "type": "dropdown",
+      "required": false,
+      "default": "aleph",
+      "data": [
+        {
+          "title": "Aleph (Focus view)",
+          "value": "aleph"
+        },
+        {
+          "title": "herdr (attach)",
+          "value": "herdr"
+        }
+      ]
+    },
+    {
+      "name": "terminal",
+      "title": "Terminal",
+      "description": "Where Aleph, attaches, new sessions and installs open, in a new tab (through aleph open-tab, the dashboard's own launcher).",
+      "type": "dropdown",
+      "required": false,
+      "default": "warp",
+      "data": [
+        {
+          "title": "Warp",
+          "value": "warp"
+        },
+        {
+          "title": "iTerm2",
+          "value": "iterm"
+        },
+        {
+          "title": "Terminal",
+          "value": "terminal"
+        },
+        {
+          "title": "Ghostty",
+          "value": "ghostty"
+        },
+        {
+          "title": "kitty",
+          "value": "kitty"
+        },
+        {
+          "title": "WezTerm",
+          "value": "wezterm"
+        },
+        {
+          "title": "Aleph's terminal setting",
+          "value": "auto"
+        }
+      ]
+    },
+    {
+      "name": "apiUrl",
+      "type": "textfield",
+      "required": false,
+      "title": "Daemon URL",
+      "description": "A daemon on another computer: its HTTP API (https://…, see aleph daemon expose). Empty: this computer's daemon.",
+      "placeholder": "https://vps.tailnet.ts.net"
+    },
+    {
+      "name": "apiToken",
+      "type": "password",
+      "required": false,
+      "title": "Daemon token",
+      "description": "A device token for that daemon: aleph daemon token new raycast --scope reply"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.0",
+    "@raycast/utils": "^2.3.3",
+    "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "^22.13.0",
+    "@types/react": "19.0.10",
+    "eslint": "^10.13.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "postinstall": "sh scripts/showcase.sh",
+    "prebuild": "sh scripts/sync-logos.sh && sh scripts/showcase.sh",
+    "build": "ray build",
+    "predev": "sh scripts/sync-logos.sh && sh scripts/showcase.sh",
+    "dev": "ray develop",
+    "prelint": "sh scripts/showcase.sh --ensure",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix",
+    "pretypecheck": "sh scripts/showcase.sh --ensure",
+    "typecheck": "tsc --noEmit",
+    "pretest": "sh scripts/showcase.sh --ensure",
+    "test": "esbuild src/lib/*.test.ts --bundle --platform=node --log-level=warning --outdir=node_modules/.cache/aleph-test && for f in node_modules/.cache/aleph-test/*.test.js; do node \"$f\" || exit 1; done"
+  },
+  "allowScripts": {
+    "esbuild": true
+  }
+}

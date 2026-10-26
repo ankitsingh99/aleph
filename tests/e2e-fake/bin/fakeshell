@@ -1,0 +1,9 @@
+#!/bin/sh
+# Fake login shell for the fake remotes: `-lc cmd` runs cmd without reading
+# /etc/profile, so the remote PATH stays the fake one. An interactive shell
+# (`-ic`, `-lic`) also gets ~/.local/bin, the way an rc file would add it.
+case $1 in
+  -ic|-lic|-ilc) shift; PATH="$HOME/.local/bin:$PATH"; export PATH;;
+  -lc|-c) shift;;
+esac
+exec /bin/sh -c "$@"

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Fake hostname for the fake machines: $ST/hostname_<host> names that one;
+# everything else gets the real hostname.
+if [[ -n ${FAKE_HOST:-} && -n ${ST:-} && -f $ST/hostname_$FAKE_HOST ]]; then
+  cat "$ST/hostname_$FAKE_HOST"; exit 0
+fi
+for h in /bin/hostname /usr/bin/hostname; do [[ -x $h ]] && exec "$h" "$@"; done
+exit 1

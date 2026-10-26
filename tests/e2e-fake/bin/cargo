@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fake cargo for tests: records the call (and where it ran) in $ST/log, prints
+# lines the way cargo does, and writes a stand-in aleph binary — a script that
+# runs this build of aleph with the machine's own folders (its HOME) under
+# systemd (ALEPH_INIT), so what `aleph daemon deploy` does there is real.
+# $ST/cargo_fail: the build fails like a compile error.
+ST=${ST:?}; echo "cargo $* (in $PWD)" >> "$ST/log"
+HERE=$(cd "$(dirname "$0")" && pwd)
+REAL=$(cd "$HERE/.." && pwd)/.run/bin/aleph
+case $1 in
+  --version) echo "cargo 1.98.0 (fake 2026-09-01)"; exit 0;;
+  build|zigbuild) ;;
+  *) exit 0;;
+esac
+if [[ -f $ST/cargo_fail ]]; then
+  echo "   Compiling aleph v2.0.0 ($PWD)"
+  echo "error[E0425]: cannot find value \`x\` in this scope"
+  echo "error: could not compile \`aleph\` (bin \"aleph\") due to 1 previous error"
+  exit 101
+fi
+triple=; prev=
+for a in "$@"; do [[ $prev == --target ]] && triple=$a; prev=$a; done
+out=${CARGO_TARGET_DIR:-target}${triple:+/$triple}/release
+for c in "serde v1.0.228" "toml_edit v0.22.27" "ratatui v0.29.0" "aleph v2.0.0 ($PWD)"; do echo "   Compiling $c"; done
+mkdir -p "$out"
+printf '#!/bin/sh\n# stand-in for a release build of aleph (tests/e2e-fake/bin/cargo); carries the dev.aleph.daemon mark deploy looks for\nXDG_CONFIG_HOME= XDG_CACHE_HOME= XDG_STATE_HOME= ALEPH_INIT=systemd exec "%s" "$@"\n' "$REAL" > "$out/aleph"
+chmod +x "$out/aleph"
+echo "    Finished \`release\` profile [optimized] target(s) in 0.42s"

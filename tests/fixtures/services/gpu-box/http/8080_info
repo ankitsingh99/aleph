@@ -1,0 +1,2 @@
+200
+{"model_id":"meta-llama/Llama-3.1-8B-Instruct","model_sha":"0e9e39f249a16976918f6564b8830bc894c89659","model_dtype":"torch.float16","model_device_type":"cuda","model_pipeline_tag":"text-generation","max_concurrent_requests":128,"max_best_of":2,"max_stop_sequences":4,"max_input_tokens":4095,"max_total_tokens":4096,"validation_workers":2,"max_client_batch_size":4,"router":"text-generation-router","version":"2.4.0","sha":"0a655a0ab5db15f08e45d8c535e263044b944190","docker_label":"sha-0a655a0"}

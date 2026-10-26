@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Fake curl: logs notification posts (ntfy / Slack / webhook) instead of
+# sending them — the argv, and a `-K -` config read from stdin (where the
+# secret URL travels). file:// URLs (the self-update test) and the daemon's
+# own HTTP API on this computer (the smoke checks) go to the real curl.
+# Web Push deliveries (Content-Encoding: aes128gcm) are logged as
+# `WEBPUSH <endpoint> <n> bytes`, their encrypted body kept in
+# $ST/push_body, and answered 201 (410 for an endpoint with /gone in it).
+real() { for c in /usr/bin/curl /opt/homebrew/bin/curl; do [[ -x $c ]] && exec "$c" "$@"; done; echo "curl: no real curl here" >&2; exit 2; }
+case "$*" in *file://*|*http://127.0.0.1:*|*http://localhost:*|*"http://[::1]:"*) real "$@";; esac
+# an agent's install script on a fake machine (`curl … | bash`, FAKE_HOST set):
+# a URL containing a line of $ST/install_fail fails like an offline machine;
+# Claude Code's writes a stand-in claude into ~/.local/bin; the rest print nothing
+if [[ -n ${FAKE_HOST:-} && " $* " == *" https://"* && " $* " != *" -K "* ]]; then
+  echo "curl $*" >> "${ST:?}/log"
+  if [[ -f $ST/install_fail ]]; then
+    while IFS= read -r f; do
+      if [[ -n $f && "$*" == *"$f"* ]]; then
+        u="$*"; u=${u#*https://}; echo "curl: (6) Could not resolve host: ${u%%/*}" >&2; exit 6
+      fi
+    done < "$ST/install_fail"
+  fi
+  # nodejs.org (Aleph's Node.js install): an index with a Current and two LTS
+  # lines; a tarball built on the spot (bin/node prints its version, bin/npm is
+  # the fake npm); SHASUMS256.txt for it ($ST/node_badsum: a wrong one)
+  if [[ "$*" == *https://nodejs.org/dist/* ]]; then
+    url=; out=; prev=
+    for a in "$@"; do [[ $prev == -o ]] && out=$a; [[ $a == https://* ]] && url=$a; prev=$a; done
+    N=$ST/nodedist; mkdir -p "$N"
+    case $url in
+      */index.json) cat <<'J'
+[{"version":"v25.1.0","date":"2026-10-20","files":["linux-x64","osx-arm64-tar"],"npm":"11.6.2","lts":false,"security":false},
+{"version":"v24.11.1","date":"2026-10-14","files":["linux-x64","osx-arm64-tar"],"npm":"11.6.1","lts":"Krypton","security":true},
+{"version":"v24.11.0","date":"2026-09-30","files":["linux-x64","osx-arm64-tar"],"npm":"11.6.0","lts":"Krypton","security":false},
+{"version":"v22.21.1","date":"2026-10-14","files":["linux-x64","osx-arm64-tar"],"npm":"10.9.4","lts":"Jod","security":true}
+]
+J
+      ;;
+      */node-v*.tar.gz)
+        f=${url##*/}; base=${f%.tar.gz}; ver=${base#node-}; ver=${ver%%-*}
+        B=$N/build/$base/bin; mkdir -p "$B"
+        printf '#!/bin/sh\n[ "$1" = --version ] && { echo %s; exit 0; }\necho "fake node: $*" >&2; exit 1\n' "$ver" > "$B/node"
+        cp "$ST/../../bin/npm" "$B/npm"; printf '#!/bin/sh\necho "fake npx: $*"\n' > "$B/npx"
+        chmod +x "$B/node" "$B/npm" "$B/npx"
+        tar -czf "$N/$f" -C "$N/build" "$base"
+        echo "downloaded $f" >> "$ST/log"
+        if [[ -n $out ]]; then cp "$N/$f" "$out"; else cat "$N/$f"; fi;;
+      */SHASUMS256.txt)
+        ver=${url%/SHASUMS256.txt}; ver=${ver##*/}
+        s=$(for t in "$N"/node-"$ver"-*.tar.gz; do [ -f "$t" ] || continue
+          if [[ -f $ST/node_badsum ]]; then h=0000000000000000000000000000000000000000000000000000000000000000; else h=$(shasum -a 256 "$t" | cut -d' ' -f1); fi
+          printf '%s  %s\n' "$h" "${t##*/}"; done)
+        if [[ -n $out ]]; then printf '%s\n' "$s" > "$out"; else printf '%s\n' "$s"; fi;;
+      *) echo "curl: (22) The requested URL returned error: 404" >&2; exit 22;;
+    esac
+    exit 0
+  fi
+  if [[ "$*" == *https://claude.ai/install.sh* ]]; then
+    cat <<'SH'
+echo "Setting up Claude Code..."
+mkdir -p "$HOME/.local/bin"
+printf '#!/bin/sh\necho "2.1.200 (Claude Code)"\n' > "$HOME/.local/bin/claude"
+chmod +x "$HOME/.local/bin/claude"
+echo "Claude Code successfully installed!"
+SH
+  fi
+  exit 0
+fi
+cfg=""
+[[ " $* " == *" -K - "* ]] && cfg=$(cat)
+# OpenRouter's API (openrouter.rs): the URL and the bearer header come in the
+# -K config on stdin. Logged as `OPENROUTER GET <path> auth=<yes|no>` — never
+# the key. Answers from tests/fixtures/openrouter; a key with "bad" in it gets
+# 401; $ST/openrouter_down: can't connect; $ST/openrouter_403: /credits needs
+# a management key. Emulates `-w '\n%{http_code}'`.
+if [[ $cfg == *'url = "https://openrouter.ai/api/v1/'* ]]; then
+  url=$(printf '%s\n' "$cfg" | sed -n 's/^url = "\(.*\)"$/\1/p'); path=${url#https://openrouter.ai/api/v1}
+  auth=no; [[ $cfg == *"Authorization: Bearer "* ]] && auth=yes
+  echo "OPENROUTER GET $path auth=$auth" >> "${ST:?}/log"
+  [[ -f $ST/openrouter_down ]] && { echo "curl: (7) Failed to connect to openrouter.ai port 443" >&2; exit 7; }
+  FX="$(cd "$(dirname "$0")/../../fixtures/openrouter" && pwd)"
+  answer() { cat "$1"; printf '\n%s' "$2"; exit 0; }
+  case $path in
+    /models) answer "$FX/models.json" 200;;
+    /key|/credits)
+      [[ $auth == yes ]] || answer "$FX/error_401.json" 401
+      [[ $cfg == *"Bearer "*bad* ]] && answer "$FX/error_401.json" 401
+      [[ $path == /credits && -f $ST/openrouter_403 ]] && { printf '{"error":{"code":403,"message":"Only management keys can fetch credits"}}\n403'; exit 0; }
+      answer "$FX/${path#/}.json" 200;;
+    *) printf '{"error":{"code":404,"message":"Not Found"}}\n404'; exit 0;;
+  esac
+fi
+echo "curl $* $(printf '%s' "$cfg" | tr '\n' ' ')" >> "${ST:?}/log"
+[[ " $* $cfg " == *"http://127.0.0.1:9/fail"* ]] && { echo "curl: (7) Failed to connect" >&2; exit 7; }
+if [[ $cfg == *"Content-Encoding: aes128gcm"* ]]; then
+  url=$(printf '%s\n' "$cfg" | sed -n 's/^url = "\(.*\)"$/\1/p')
+  body=$(printf '%s\n' "$cfg" | sed -n 's/^data-binary = "@\(.*\)"$/\1/p')
+  n=$(wc -c < "$body" | tr -d ' ')
+  cp "$body" "$ST/push_body"
+  echo "WEBPUSH $url $n bytes" >> "$ST/log"
+  [[ $url == */gone* ]] && { printf 410; exit 0; }
+  printf 201; exit 0
+fi
+# following an ntfy reply topic: replay what the test queued, once
+if [[ $cfg == *"-r/json"* ]]; then
+  [[ -f $ST/ntfy_replies ]] && { cat "$ST/ntfy_replies"; rm -f "$ST/ntfy_replies"; }
+  sleep 1
+fi
+exit 0

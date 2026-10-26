@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Fake uname for the fake machines: one with $ST/uname_<host> ("Linux x86_64")
+# answers as that system; everything else gets the real uname. A fake
+# machine always has its own name (`-n`), so two fake machines are two.
+if [[ -n ${FAKE_HOST:-} && "$*" == "-n" ]]; then
+  echo "$FAKE_HOST"; exit 0
+fi
+if [[ -n ${FAKE_HOST:-} && -n ${ST:-} && -f $ST/uname_$FAKE_HOST ]]; then
+  read -r s m < "$ST/uname_$FAKE_HOST"
+  case "$*" in
+    -m) echo "$m";;
+    -sm|"-s -m") echo "$s $m";;
+    -n) echo "$FAKE_HOST";;
+    -r) echo "6.8.0-fake";;
+    -a) echo "$s $FAKE_HOST 6.8.0-fake #1 SMP $m GNU/Linux";;
+    *) echo "$s";;
+  esac
+  exit 0
+fi
+for u in /usr/bin/uname /bin/uname; do [[ -x $u ]] && exec "$u" "$@"; done
+exit 1

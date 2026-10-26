@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fake node for the fake remotes: only answers --version.
+[ "$1" = --version ] && { echo v22.11.0; exit 0; }
+echo "fake node: $*" >&2; exit 1

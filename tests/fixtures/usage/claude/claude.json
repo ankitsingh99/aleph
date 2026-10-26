@@ -1,0 +1,31 @@
+{
+  "numStartups": 3,
+  "oauthAccount": {
+    "accountUuid": "72f198b7-0000-4c4a-91f0-b3f43cd7df5d",
+    "emailAddress": "u@home.example",
+    "organizationName": "u's Organization",
+    "billingType": "stripe_subscription",
+    "organizationRateLimitTier": "default_claude_max_5x",
+    "userRateLimitTier": null
+  },
+  "projects": {
+    "/home/u/shop": { "lastSessionId": "x", "five_hour": "not this one" }
+  },
+  "cachedUsageUtilization": {
+    "fetchedAtMs": 1792737920957,
+    "accountUuid": "72f198b7-0000-4c4a-91f0-b3f43cd7df5d",
+    "utilization": {
+      "five_hour": {
+        "utilization": 13,
+        "resets_at": "2026-10-23T10:59:59.782476+00:00",
+        "limit_dollars": null
+      },
+      "seven_day": {
+        "utilization": 44.5,
+        "resets_at": "2026-10-28T11:00:00+00:00"
+      },
+      "seven_day_opus": null,
+      "limits": [{ "kind": "session", "percent": 13 }]
+    }
+  }
+}

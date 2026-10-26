@@ -1,0 +1,19 @@
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*
+LISTEN 0      4096       127.0.0.1:11434      0.0.0.0:*
+LISTEN 0      4096       127.0.0.1:39999      0.0.0.0:*
+LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("vllm",pid=4242,fd=27))
+LISTEN 0      2048       127.0.0.1:43117      0.0.0.0:*    users:(("vllm",pid=4242,fd=31))
+LISTEN 0      2048       127.0.0.1:30000      0.0.0.0:*    users:(("cef_server",pid=6480,fd=92))
+LISTEN 0      128        127.0.0.1:30001      0.0.0.0:*    users:(("python3",pid=5150,fd=12))
+LISTEN 0      4096         0.0.0.0:8080       0.0.0.0:*    users:(("docker-proxy",pid=3100,fd=4))
+LISTEN 0      4096            [::]:8080          [::]:*    users:(("docker-proxy",pid=3101,fd=4))
+LISTEN 0      4096       127.0.0.1:8010       0.0.0.0:*    users:(("tritonserver",pid=7000,fd=30))
+LISTEN 0      4096       127.0.0.1:8011       0.0.0.0:*    users:(("tritonserver",pid=7000,fd=31))
+LISTEN 0      4096       127.0.0.1:8012       0.0.0.0:*    users:(("tritonserver",pid=7000,fd=32))
+LISTEN 0      5          127.0.0.1:8001       0.0.0.0:*    users:(("python3",pid=3504,fd=3))
+LISTEN 0      4096         0.0.0.0:5000       0.0.0.0:*
+LISTEN 0      511        127.0.0.1:6006       0.0.0.0:*    users:(("tensorboard",pid=3499,fd=10))
+LISTEN 0      4096       127.0.0.1:36467      0.0.0.0:*    users:(("server",pid=3498,fd=6))
+LISTEN 0      128        127.0.0.1:1234       0.0.0.0:*    users:(("ssh",pid=8800,fd=5))
+LISTEN 0      128            [::1]:1234          [::]:*    users:(("ssh",pid=8800,fd=6))
+LISTEN 0      2048       127.0.0.1:4000       0.0.0.0:*    users:(("litellm",pid=9100,fd=7))

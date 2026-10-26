@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Fake terminal tab: env.sh sets ALEPH_TAB_CMD to this, so "open in a new tab"
+# never reaches a real terminal app in the fake world. termlaunch runs it as
+# `fake-tab <title> <command line>`; it records `TAB <title> :: <command>` in
+# $ST/log. With $ST/tab_run present it also runs the command, detached, the way
+# the tab's shell would: $ST/tab_append (if any) added to its arguments, stdin
+# from $ST/tab_input (else /dev/null), output to $ST/tab_<n>.out.
+ST=${ST:?}; title=$1; cmd=$2
+echo "TAB $title :: $cmd" >> "$ST/log"
+if [[ -f $ST/tab_run ]]; then
+  n=$(( $(ls "$ST"/tab_*.out 2>/dev/null | wc -l) + 1 ))
+  [[ -f $ST/tab_append ]] && cmd="$cmd $(cat "$ST/tab_append")"
+  in=$ST/tab_input; [[ -f $in ]] || in=/dev/null
+  # a tab outlives the terminal that opened it: its own session (setsid, via
+  # perl where there's no setsid(1)), its hangup ignored
+  trap '' HUP
+  if command -v setsid >/dev/null 2>&1; then
+    setsid sh -c "$cmd" < "$in" > "$ST/tab_$n.out" 2>&1 &
+  else
+    perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' sh -c "$cmd" < "$in" > "$ST/tab_$n.out" 2>&1 &
+  fi
+  disown
+fi
+exit 0

@@ -1,0 +1,4 @@
+PID   COMMAND
+    1 init
+  412 /usr/bin/ollama serve
+  500 sh

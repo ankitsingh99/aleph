@@ -1,0 +1,23 @@
+    1 /sbin/init splash
+ 1200 /usr/local/bin/ollama serve
+ 1260 /usr/local/bin/ollama runner --model /usr/share/ollama/.ollama/models/blobs/sha256-667b0c1932bc6ffc593ed1d03f895bf2dc8dc6df21db3042284a6f4416b06a29 --ctx-size 8192 --batch-size 512 --n-gpu-layers 33 --threads 16 --parallel 4 --port 39999
+ 2000 -bash
+ 3100 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8080 -container-ip 172.17.0.2 -container-port 80
+ 3101 /usr/bin/docker-proxy -proto tcp -host-ip :: -host-port 8080 -container-ip 172.17.0.2 -container-port 80
+ 3140 /usr/bin/containerd-shim-runc-v2 -namespace moby -id 9f1c2d3e4b5a -address /run/containerd/containerd.sock
+ 3150 text-generation-launcher --model-id meta-llama/Llama-3.1-8B-Instruct --port 80
+ 3160 text-generation-router --max-concurrent-requests 128 --max-input-tokens 4095 --max-total-tokens 4096 --port 80 --tokenizer-name meta-llama/Llama-3.1-8B-Instruct
+ 3498 /home/selene/.venv/lib/python3.10/site-packages/tensorboard_data_server/bin/server --logdir=runs --reload=5 --port=0
+ 3499 /home/selene/.venv/bin/python3 /home/selene/.venv/bin/tensorboard --logdir runs
+ 3504 python3 -m http.server 8001 --bind 127.0.0.1 --directory /home/selene/videos
+ 4242 /home/selene/.venv/bin/python3 /home/selene/.venv/bin/vllm serve meta-llama/Llama-3.1-8B-Instruct --gpu-memory-utilization 0.9 --max-model-len 32768
+ 4300 VLLM::EngineCore
+ 5150 python3 -m sglang.launch_server --model-path Qwen/Qwen2.5-7B-Instruct --port 30001 --host 127.0.0.1
+ 5200 sglang::scheduler_TP0
+ 6480 /snap/pycharm-community/676/plugins/jcef-plugin/jcef/cef_server --port=30000 --loglevel=disable
+ 7000 /opt/tritonserver/bin/tritonserver --model-repository=/models --http-port 8010 --grpc-port 8011 --metrics-port 8012
+ 8800 ssh -N -L 1234:localhost:1234 mac
+ 9100 /home/selene/.venv/bin/python3 /home/selene/.venv/bin/litellm --config /etc/litellm/config.yaml --port 4000
+ 9300 vim ollama-notes.md
+ 9301 grep -r vllm serve .
+ 9400 python3 train.py --model llama3 --use-vllm

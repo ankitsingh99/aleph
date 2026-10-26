@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Fake launchctl for tests: records the call in $ST/log and remembers what's
+# loaded (per fake HOME), so print / kickstart / bootout answer like launchd.
+ST=${ST:?}; echo "launchctl $*" >> "$ST/log"
+D="$HOME/.fake-launchd"; mkdir -p "$D"
+label() { local t=${1##*/}; echo "${t%.plist}"; }
+case $1 in
+  bootstrap)
+    [[ -f $3 ]] || { echo "Bootstrap failed: 5: Input/output error" >&2; exit 5; }
+    echo "$3" > "$D/$(label "$3")";;
+  bootout) rm -f "$D/$(label "$2")";;
+  kickstart)
+    t=${*: -1}; l=$(label "$t")
+    [[ -f $D/$l ]] || { echo "Could not find service \"$l\" in domain for user gui: 501" >&2; exit 113; };;
+  print)
+    l=$(label "$2")
+    [[ -f $D/$l ]] || { echo "Could not find service \"$l\" in domain for user gui: 501" >&2; exit 113; }
+    printf '%s = {\n\tactive count = 1\n\tpath = %s\n\ttype = LaunchAgent\n\tstate = running\n\n\tprogram = aleph\n\targuments = {\n\t\taleph\n\t}\n\n\tpid = 4242\n\tlast exit code = (never exited)\n}\n' "$2" "$(cat "$D/$l")";;
+esac
+exit 0

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake notify-send for tests: records the call in $ST/log and succeeds.
+ST=${ST:?}; echo "notify-send $*" >> "$ST/log"

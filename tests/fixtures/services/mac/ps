@@ -1,0 +1,10 @@
+  676     1 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter
+  801     1 /Applications/LM Studio.app/Contents/MacOS/LM Studio
+  802   810 /Applications/Ollama.app/Contents/Resources/ollama
+  803   900 /opt/homebrew/Cellar/python@3.12/3.12.8/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python
+  804     1 /Applications/Jan.app/Contents/MacOS/Jan
+  805     1 /Applications/GPT4All.app/Contents/MacOS/gpt4all
+  806   900 next-server (v15.1.0)
+  810     1 /Applications/Ollama.app/Contents/MacOS/Ollama
+  900     1 -zsh
+ 1060     1 /opt/homebrew/opt/redis/bin/redis-server

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Fake ssh-keyscan: one fixed (throwaway, public-only) ed25519 key for any host.
+ST=${ST:?}; echo "ssh-keyscan $*" >> "$ST/log"
+host=${@: -1}
+echo "$host ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB0QPDpsvyXaG7+pIiBCuAKd4kjTTAawnDiZ7UNz2ztP"

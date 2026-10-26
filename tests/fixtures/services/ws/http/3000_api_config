@@ -1,0 +1,2 @@
+200
+{"status":true,"name":"Open WebUI","version":"0.5.20","default_locale":"","oauth":{"providers":{}},"features":{"auth":true,"auth_trusted_header":false,"enable_ldap":false,"enable_api_key":true,"enable_signup":false,"enable_login_form":true,"enable_websocket":true}}

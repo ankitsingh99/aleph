@@ -1,0 +1,11 @@
+# Warp tab config → ~/.warp/tab_configs/aleph_b31.toml
+# open with:  open 'warp://tab_config/aleph_b31'   (or bind it via extras/raycast/)
+name = "Aleph @ b31"
+
+[[panes]]
+id = "main"
+type = "terminal"
+# "aleph" (dashboard) · "aleph -i" (pick a folder) · "aleph new" · "aleph resume"
+# another host:  "aleph --host gpu2 -i"
+commands = ["aleph -i"]
+is_focused = true

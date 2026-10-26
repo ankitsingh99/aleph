@@ -1,0 +1,5 @@
+#!/bin/sh
+# A session smoke checks can talk to, whatever earlier checks closed: the
+# first agent session (not a shell) that isn't waiting on a question and has
+# a folder. Prints "host name pane folder-path".
+aleph ls --json </dev/null | jq -r '[.hosts[] | .alias as $h | .sessions[]? | select(.agent != "shell" and .status != "blocked" and (.cwd | startswith("/"))) | "\($h) \(.name) \(.pane_id) \(.cwd)"][0] // empty'

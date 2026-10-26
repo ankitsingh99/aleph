@@ -1,0 +1,14 @@
+#!/bin/bash
+# Fake ssh-keygen: `-y -P "" -f key` (is it encrypted?) answers from the file;
+# fingerprints (`-l -f -`) go to the real ssh-keygen, which only reads.
+if [[ " $* " == *" -l "* ]]; then
+  for p in /usr/bin/ssh-keygen /opt/homebrew/bin/ssh-keygen /usr/local/bin/ssh-keygen; do
+    [[ -x $p ]] && exec "$p" "$@"
+  done
+  exit 1
+fi
+for a; do last=$a; done
+if grep -q ENCRYPTED "$last" 2>/dev/null; then
+  echo "Load key \"$last\": incorrect passphrase supplied to decrypt private key" >&2; exit 1
+fi
+exit 0

@@ -1,0 +1,86 @@
+# fmt · clippy -D warnings · unit tests (ubuntu + macos) · fake-machine smoke (ubuntu)
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  test:
+    name: clippy + tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: unit tests
+        run: cargo test --locked
+      # showcase mode (demos) is a feature releases leave out: it must build
+      # and pass on its own, and leave nothing in a build without it
+      - name: clippy (showcase)
+        run: cargo clippy --locked --all-targets --features showcase -- -D warnings
+      - name: unit tests (showcase)
+        run: cargo test --locked --features showcase
+
+  smoke:
+    name: e2e-fake smoke (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: tools
+        run: |
+          command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+          jq --version
+      - name: build
+        run: cargo build --locked
+      - name: smoke
+        run: tests/e2e-fake/smoke.sh
+      - name: smoke log
+        if: failure()
+        run: cat tests/e2e-fake/.run/state/log || true
+
+  no-showcase:
+    name: release has no showcase code (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --release
+      - run: tools/showcase-strings.sh target/release/aleph
+      # the Raycast extension's showcase module is the inert stub unless asked for
+      - name: Raycast showcase module is the stub
+        run: sh extras/raycast-extension/scripts/showcase.sh && sh extras/raycast-extension/scripts/showcase.sh --check

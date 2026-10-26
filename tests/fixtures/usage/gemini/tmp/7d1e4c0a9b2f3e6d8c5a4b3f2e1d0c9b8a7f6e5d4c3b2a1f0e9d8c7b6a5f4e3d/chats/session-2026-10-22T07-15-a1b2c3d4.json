@@ -1,0 +1,61 @@
+{
+  "sessionId": "a1b2c3d4-0000-4000-8000-000000000004",
+  "projectHash": "7d1e4c0a9b2f3e6d8c5a4b3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d",
+  "startTime": "2026-10-22T07:15:00.000Z",
+  "lastUpdated": "2026-10-22T07:17:00.000Z",
+  "messages": [
+    {
+      "id": "m-0001",
+      "timestamp": "2026-10-22T07:15:00.000Z",
+      "type": "user",
+      "content": "SECRET question for gemini"
+    },
+    {
+      "id": "m-0002",
+      "timestamp": "2026-10-22T07:15:30.000Z",
+      "type": "gemini",
+      "content": "SECRET answer with \"quotes\"",
+      "thoughts": [
+        {
+          "subject": "SECRET",
+          "description": "SECRET thinking",
+          "timestamp": "2026-10-22T07:15:10.000Z"
+        }
+      ],
+      "tokens": {
+        "input": 1200,
+        "output": 450,
+        "cached": 200,
+        "thoughts": 50,
+        "tool": 30,
+        "total": 1730
+      },
+      "model": "gemini-2.5-pro",
+      "toolCalls": [
+        {
+          "id": "call-1",
+          "name": "read_file",
+          "args": {
+            "path": "SECRET.txt"
+          },
+          "status": "success",
+          "timestamp": "2026-10-22T07:15:20.000Z"
+        }
+      ]
+    },
+    {
+      "id": "m-0003",
+      "timestamp": "2026-10-22T07:16:30.000Z",
+      "type": "gemini",
+      "content": "SECRET second answer",
+      "tokens": { "input": 2000, "output": 100, "cached": 1500, "thoughts": 0, "tool": 0, "total": 2100 },
+      "model": "gemini-2.5-flash"
+    },
+    {
+      "id": "m-0004",
+      "timestamp": "2026-10-22T07:17:00.000Z",
+      "type": "info",
+      "content": "SECRET info line"
+    }
+  ]
+}

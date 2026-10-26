@@ -1,0 +1,1015 @@
+.\" claude-herdr(1) — keep in step with main.rs COMMANDS, config.rs KNOWN and cli.rs.
+.\" View:  man ./docs/claude-herdr.1      Lint:  mandoc -T lint docs/claude-herdr.1
+.TH CLAUDE-HERDR 1 2026-10-21 "claude-herdr 1.0.0" "User Commands"
+.SH NAME
+claude-herdr \- coding-agent sessions inside herdr across your ssh machines
+.SH SYNOPSIS
+.B claude
+.RB [ \-\-host
+.IR alias ]
+.RB [ \-\-debug ]
+.RI [ command ]
+.RI [ args ...]
+.br
+.B claude-herdr
+.RB [ \-\-host
+.IR alias ]
+.RB [ \-\-debug ]
+.RI [ command ]
+.RI [ args ...]
+.SH DESCRIPTION
+.B claude-herdr
+.\" keep the agent list short; `claude agents --all` has them all
+runs coding agents \(em Claude Code, Codex, OpenCode, Gemini, Cursor, Copilot
+and every other agent herdr supports \(em in
+.BR herdr (1)
+on the machines you reach over
+.BR ssh (1).
+A shell function maps
+.B claude
+(the default name; install.sh
+.B \-\-name
+picks another) to it, so plain
+.B claude
+opens the master dashboard.
+The dashboard shows every machine's sessions, grouped and coloured, with live
+machine stats, the selected
+session's question and its recent output.
+.PP
+Commands that list sessions work across the whole fleet (the
+.B hosts
+setting), or across one machine with
+.BR \-\-host .
+Remote work is plain POSIX
+.B sh
+sent over ssh, and nothing is installed on the hosts.
+Every ssh call uses BatchMode and a timeout, so a slow or dead machine never
+blocks the others.
+Cached data is shown at once and marked stale.
+.PP
+Everything that isn't a claude\-herdr command goes, untouched, to the local
+agent the shell function stands in for: the
+.B wraps
+setting, Claude Code by default.
+This covers its own flags
+.RB ( \-h ,
+.BR \-\-help ,
+.BR \-v ,
+.BR \-\-version ,
+and for Claude Code
+.BR \-p ,
+.BR \-\-print ,
+.BR \-c ,
+.B \-\-continue
+and
+.BR \-r ),
+its own subcommands
+.RB ( mcp ,
+.BR config ,
+.BR install ,
+.BR plugin
+and any other subcommand its
+.B \-\-help
+lists, re\-read daily), anything run inside a herdr pane (when
+.B HERDR_ENV
+is set), and any command that needs a terminal when stdin isn't one.
+.B "command claude"
+(or
+.BR "command" " \fIagent\fR)"
+always reaches the agent directly.
+.SH GLOBAL OPTIONS
+.TP
+.BI \-\-host " alias\fR, " \-H " alias\fR, " \-\-host= alias
+Use this ssh alias instead of the default host.
+For listing commands, this narrows the fleet to one machine.
+.TP
+.B \-\-debug
+Log every external command, with its duration, exit status and stderr, to
+.IR ~/.cache/claude\-herdr/debug.log .
+.SH COMMANDS
+Commands marked
+.I (planned)
+are designed and not built yet.
+Until a command lands,
+.B "claude help"
+marks it as planned and running it explains that it isn't built yet.
+.SS Sessions
+.TP
+.B claude
+Open the dashboard: the Fleet view, or the Hosts view when no host is set yet.
+Same as
+.BR "claude ui" .
+.TP
+.B new \fR[\fB@\fIpreset\fR] [\fB\-\-dir\fR \fI/abs\fR] [\fB\-\-name\fR \fIn\fR] [\fB\-\-agent\fR \fIk\fR] [\fB\-\-worktree\fR[\fB=\fIbranch\fR]] [\fB\-\-tile\fR \fIN\fR] [\fB\-m\fR \fIprompt\fR] [\fB\-\-\fR \fIargs\fR...]
+Start an agent in a new herdr tab named
+.IR <agent>_<verb> [ :folder ]
+.RI ( claude_ignite:px ", " codex_tune ),
+then attach.
+Names are fresh across every machine and the last 7 days, start with a letter
+no other session uses, and avoid
+look\-alikes.
+.RS
+.TP 16
+.BR \-\-dir ", " \-d
+Folder on the host.
+It must be absolute, because
+.I ~
+would expand locally.
+.B CC_DIR
+works too.
+.TP
+.BR \-\-name ", " \-n
+Session name: lowercase letters, digits,
+.B \-
+and
+.BR _ ,
+starting with a letter, at most 32 characters.
+.TP
+.BR \-\-agent ", " \-a
+Agent:
+.BR claude ", " codex ", " opencode ", " gemini ", \&..."
+(default: the
+.B agent
+setting, or
+.BI host. alias .agent
+for that machine;
+.B "claude agents \-\-all"
+lists every one).
+.TP
+.BR \-\-worktree ", " \-w
+Start in a new git worktree on
+.I branch
+(default
+.IR <agent>/<name> ).
+.TP
+.BR \-\-tile ", " \-t
+Tile N agents (1\(en9) in one tab, as an even grid: one
+.B layout.apply
+over herdr's socket (every pane starts at its final size), else splits.
+.TP
+.BR \-\-prompt ", " \-m
+First prompt.
+.TP
+.BI @ preset
+A saved starting point (see
+.BR preset ).
+Explicit flags win over the preset.
+.TP
+.B \-\- \fIargs\fR...
+Passed to the agent.
+.RE
+.TP
+.BR \-i ", " browse " [\fIargs\fR...]"
+Fuzzy\-search the host's folders, then start a session in the one you pick,
+or attach to the session already
+running there.
+.I args
+are passed on as with
+.BR new .
+.TP
+.BR ls ", " list " [" \-\-json " | " \-\-plain " | " \-\-watch ]
+In a terminal, open the dashboard.
+.B \-\-plain
+prints the table.
+.B \-\-watch
+reprints it every
+.B refresh
+seconds.
+.B \-\-json
+prints machine\-readable output (see
+.BR "JSON OUTPUT" ).
+When stdout is piped, prints TSV:
+host, name, status, cwd, pane, status\-since, title.
+.TP
+.BR resume ", " attach " [\fIname\fR | \fIhost\fB:\fIname\fR]"
+Reattach to a session; this never creates one.
+A session can be picked by name, tab label, pane id, or its 1\-based position.
+With no name and several sessions, opens the dashboard.
+.TP
+.B last
+Start a new session where you started the last one: same host, folder, agent
+and arguments.
+.TP
+.B send \fIname\fR \fItext\fR...
+Prompt a running session without attaching.
+If the session is waiting on a question, this is refused: answer it with
+.BR keys .
+.TP
+.B keys \fIname\fR \fIkey\fR...
+Send keys, for example to answer a question:
+.BR 1 ", " 2 ", " enter ", " esc ", " up ", " down ", " tab ", " space ,
+.BR ctrl+c ", " shift+tab .
+.TP
+.B rename \fIname\fR \fInew\fR
+Rename a session.
+This updates the tab label (keeping its prefix and
+.I :folder
+part), the herdr agent name and the sidebar token.
+.TP
+.B close \fIname\fR [\fB\-\-yes\fR | \fB\-y\fR] [\fB\-\-now\fR] [\fB\-\-worktree\fR]
+Stop a session and close its pane, after
+.B close.grace
+(5s; the agent keeps running until then).
+Asks first unless given
+.BR \-\-yes .
+When a daemon or a dashboard runs the hub, it carries the close out and
+this returns at once; otherwise this waits the grace itself, and ctrl+c
+keeps the session.
+.B \-\-now
+closes at once.
+.TP
+.B close \-\-undo \fR[\fIname\fR]
+Keep a session whose close is waiting out its grace (without a name: the
+last close asked, wherever it came from).
+.B close \-\-pending
+lists them.
+.SS Fleet
+.TP
+.B wall \fR[\fIname\fR | \fIhost\fB:\fIname\fR]... \fI(planned)\fR
+Live tiles of sessions from every machine, through herdr terminal streams.
+The named sessions are shown, or the marked ones, or all of them with the
+blocked ones first.
+Layouts are grid, main, rows and cols (see
+.BR wall_layout ),
+with
+.B wall_max
+tiles per page.
+Keys are under
+.BR KEYS .
+.TP
+.B tile \fIname\fR \fIname\fR...
+Move sessions on the same machine into one herdr tab, as a grid
+.RB ( pane.move
+over herdr's socket, else its CLI).
+.TP
+.B hub
+Open herdr's own window with every saved machine in its sidebar
+.RB ( "ctrl+b w"
+switches machine).
+Offers to run
+.B "herdr machine add"
+for fleet hosts that herdr doesn't know yet.
+.TP
+.BR status " [" \-\-short " | " \-\-json " | " \-\-watch "] [" \-\-live ]
+Counts of working, need\-you, done and idle sessions, and which sessions need
+you.
+Reads
+the
+.I status.json
+written by
+.B claude watch
+when it is fresh; otherwise, or with
+.BR \-\-live ,
+polls the machines.
+.B \-\-short
+prints a compact line such as
+.BR "\[u25B2]1 \[u273B]2 \[u2713]3" ,
+for status bars.
+.TP
+.B watch \fR[\fB\-\-once\fR] [\fB\-\-interval\fR \fIS\fR] [\fB\-\-install\fR | \fB\-\-uninstall\fR] \fI(planned)\fR
+Poll every machine every
+.B watch_interval
+seconds and notify when a session becomes blocked.
+With
+.BR notify_done=true ,
+also notify when a working session finishes.
+Never notifies on the first poll.
+Notifications go through terminal\-notifier or osascript on macOS, and
+notify\-send on Linux.
+Writes
+.I status.json
+after every poll.
+.B \-\-once
+checks once and exits.
+.B \-\-install
+runs the watcher at login, with a launchd agent
+.RI ( com.claude\-herdr.watch )
+on macOS or a systemd user unit
+.RI ( claude\-herdr\-watch.service )
+on Linux.
+.B \-\-uninstall
+removes it.
+.TP
+.BR history " [" \-n " \fIN\fR] [" \-\-json ]
+Sessions you started, newest first (default 30).
+.TP
+.BR recent " [" \-\-json ]
+Folders ranked by frecency.
+Piped output is TSV: host, dir, count.
+.TP
+.BR preset ", " presets " [" ls " [" \-\-json "] | " add " \fIname\fR \&... | " rm " \fIname\fR | " show " \fIname\fR]"
+Saved starting points for
+.BI "claude new @" name\fR.
+.B add
+takes
+.BR \-\-host ,
+.BR \-\-dir ,
+.BR \-\-agent ,
+.BR \-\-worktree ,
+.B \-\-prompt
+and
+.BR \-\- " \fIargs\fR..."
+.SS Hosts
+.TP
+.BR host ", " hosts " [\fIsubcommand\fR]"
+Manage machines.
+With no subcommand, shows the default host.
+.RS
+.TP 22
+.BR list " [" \-\-json ]
+ssh aliases from
+.IR ~/.ssh/config ,
+with the default, herdr and fleet columns.
+.TP
+.B pick
+Choose the default host interactively.
+.TP
+.B set \fIalias\fR [\fB\-\-machine\fR \fIlabel\fR]
+Set the default host, which is where
+.B claude new
+goes.
+.TP
+.B add \fIalias\fR \fR[\fIuser\fB@\fR]\fIhost\fR[\fB:\fIport\fR] [\fB\-i\fR \fIkey\fR] [\fB\-\-no\-default\fR] [\fB\-\-here\fR]
+Add a Host entry to
+.I ~/.ssh/config
+(after making a backup), then set it as the default or add it to the fleet,
+as
+.B include
+does.
+.TP
+.B key \fR[\fIalias\fR]
+One\-time key login setup.
+This is the only flow that may ask for a password.
+.TP
+.B include \fIalias\fR [\fB\-\-here\fR]
+Add a machine to the fleet (the dashboard).
+It gets a colour of its own.
+Aleph looks at it first: one with no herdr or no agent gets
+.B host setup
+in a new terminal tab
+.RB ( \-\-here :
+in this terminal).
+.TP
+.B setup \fR[\fIalias\fR] [\fB\-\-agents\fR \fIa,b\fR] [\fB\-\-yes\fR] [\fB\-\-no\-herdr\fR] [\fB\-\-no\-agents\fR] [\fB\-\-no\-node\fR]
+Everything a machine needs, asking before anything is installed: key login,
+herdr (installed or updated, saved in herdr), then a checklist of every agent
+Aleph knows (the ones there ticked).
+The chosen ones install one after another, each checked (on the PATH,
+.B \-\-version
+runs, herdr sees it); a failure says why and offers retry, skip or the log.
+npm agents get the current Node.js LTS first when the machine has none
+(sha256\-checked, in the home folder, no sudo;
+.B agents.node = off
+or
+.B \-\-no\-node
+turns that off).
+herdr's integrations are offered at the end.
+When it's done the running Aleph (the daemon, an open dashboard) looks at the
+machine again
+.RB ( hosts.refresh ).
+.TP
+.B exclude \fIalias\fR
+Remove a machine from the fleet.
+Its sessions keep running.
+.TP
+.B color \fIalias\fR \fIcolour\fR
+Set the machine's colour:
+.BI # rrggbb
+or a palette name (blue, mauve, teal, peach, pink, green, yellow, sky,
+lavender, flamingo).
+.RE
+.TP
+.BR doctor " [" \-\-json ]
+Check this Mac (shell function, herdr, ssh), the host (dns, auth methods, key
+login), the tools on it (herdr, and every agent found there with its herdr
+integration; it fails when the default agent is missing), herdr's saved
+machine, and the Warp/Raycast shortcuts.
+Locally it also checks the agent the wrapper stands in for
+.RB ( wraps ).
+Exits 1 if any check fails.
+.SS Setup
+.TP
+.BR settings ", " prefs " [" list " [" \-\-json "] | " get " \fIkey\fR | " set " \fIkey value\fR | " unset " \fIkey\fR | " edit " | " path ]
+Every option, with its default (see
+.BR CONFIGURATION ).
+.B set
+validates booleans, numbers and choices.
+.TP
+.B theme \fR[\fBshow\fR | \fBherdr\fR [\fB\-\-apply\fR] | \fBmachines\fR [\fB\-\-apply\fR]] \fI(planned)\fR
+.B show
+prints the machine swatches and session hues.
+.B herdr
+prints a herdr sidebar config that colours machine labels and session glyphs;
+with
+.BR \-\-apply ,
+it writes that config into
+.I ~/.config/herdr/config.toml
+between
+.B "# >>> claude\-herdr >>>"
+markers, after making a backup.
+.B "machines \-\-apply"
+sets each host's herdr accent to its machine colour, then reloads the herdr
+server.
+.TP
+.B shortcuts \fR[\fBinstall\fR | \fBls\fR] [\fB\-\-dry\-run\fR] \fI(planned)\fR
+Generate a Warp tab config
+.RI ( ~/.warp/tab_configs/claude_<host>.toml )
+and a Raycast script for every fleet host, plus Raycast
+.I claude\-status.sh
+and
+.I claude\-new.sh
+scripts in the first
+.B raycast_dirs
+folder.
+Only files containing
+.B "# managed by claude\-herdr"
+are overwritten.
+.TP
+.BR completions ", " completion " " zsh | bash | fish " [" \-\-name " \fIcmd\fR] \fI(planned)\fR"
+Print a shell completion script.
+It completes subcommands,
+.B \-\-host
+values, session names, presets, settings keys and
+.B new
+flags.
+Example:
+.B "source <(claude\-herdr completions zsh)"
+.TP
+.BR self\-update ", " selfupdate " [" \-\-check "] \fI(planned)\fR"
+Update from the latest GitHub release of
+.BR update_repo .
+The release asset is
+.IR claude\-herdr\-<target>.tar.gz ,
+checked against
+.IR SHA256SUMS ,
+and the binary is replaced atomically.
+.B \-\-check
+only reports.
+.TP
+.B version
+Versions of claude\-herdr, the local agent it wraps
+.RB ( wraps )
+and herdr.
+.TP
+.B help \fR[\fIcommand\fR]
+Overview, or the details of one command.
+.SH KEYS
+Keys can be overridden with
+.BI key. action = key\fR.
+Press
+.B ?\&
+in the dashboard for the full list.
+.SS Dashboard
+.TP 18
+.BR \(ua\(da " j k"
+Move.
+.TP
+.B [ ]
+Previous / next machine.
+.TP
+.B space
+Mark a session; on a machine header, collapse or expand it.
+.TP
+.B enter
+Attach in herdr;
+.B "ctrl+b q"
+returns here when
+.B return_to_dashboard
+is on.
+.TP
+.B a
+Attach directly to just that agent, without herdr's chrome.
+.TP
+.B n
+New\-session form.
+.TP
+.B i
+Browse the machine's folders.
+.TP
+.B w
+Wall of the marked sessions, or of all of them.
+.TP
+.B s
+Send a prompt.
+.TP
+.B y
+Approve (send
+.BR 1 ).
+.TP
+.B K
+Send keys.
+.TP
+.B b
+Broadcast a prompt to the marked sessions, or to the whole machine from its
+header.
+.TP
+.B R
+Rename.
+.TP
+.B x
+Close (asks first).
+.TP
+.B c
+Copy the recent output.
+.TP
+.B t
+Tile the marked sessions into one herdr tab.
+.TP
+.B H
+herdr hub.
+.TP
+.BR ctrl+k ", " p
+Command palette: sessions, machines, actions, presets
+.RB ( @name )
+and recent folders.
+.TP
+.B /
+Filter.
+.TP
+.B r
+Refresh.
+.TP
+.B 1\(en6
+Views: Fleet, Wall, Hosts, History, Settings, Doctor.
+.TP
+.BR q ", " esc
+Quit.
+.SS Wall
+.TP 18
+.BR "arrows" ", " "h j k l"
+Move focus.
+.TP
+.B enter
+Attach directly, then come back.
+.TP
+.B A
+Attach in herdr.
+.TP
+.B z
+Zoom the focused tile.
+.TP
+.B i
+Type into the focused tile;
+.B ctrl+]
+leaves.
+.TP
+.B 1\(en9
+Send that key.
+.TP
+.BR s " / " b
+Prompt the focused tile / broadcast to all tiles.
+.TP
+.B L
+Cycle the layout.
+.TP
+.BR PgUp " / " PgDn
+Page.
+.TP
+.BR x " / " a
+Drop a tile / add sessions.
+.TP
+.B T
+Tile this machine's sessions natively in herdr.
+.TP
+.B esc
+Back to the Fleet view.
+.SS Folder browser
+.TP 18
+.I type
+Fuzzy search.
+.TP
+.B enter
+Start a session here.
+.TP
+.B \(->
+Open the folder.
+.TP
+.BR ~/ " or " /
+Jump to a path as you type.
+.TP
+.B ctrl+o
+Show hidden and ignored folders.
+.SS herdr
+.TP 18
+.B ctrl+b q
+Detach; the session keeps running.
+.TP
+.B ctrl+b w
+Switch machine (in
+.BR hub ).
+.SH CONFIGURATION
+The configuration is a plain
+.IB key = value
+file: comments start with
+.BR # ,
+and the last occurrence of a key wins.
+Edit it by hand, with
+.BR "claude settings" ,
+or in the dashboard's Settings view.
+.SS Settings
+.TP 22
+.BR ssh_host " (empty)"
+Default ssh alias.
+.TP
+.BR machine " (empty)"
+herdr machine label for the default host.
+.TP
+.BR hosts " (empty)"
+Machines shown together, comma\-separated.
+Empty means just the default host.
+.TP
+.BR refresh " (10)"
+Seconds between session refreshes in every live view.
+.TP
+.BR stats " (on)"
+Live machine stats in the dashboard:
+.BR on ", " selected " or " off .
+.TP
+.BR stats_interval " (2)"
+Seconds between machine stat samples.
+.TP
+.BR theme " (auto)"
+.BR auto ", " dark " or " light .
+.B NO_COLOR
+turns colour off.
+.TP
+.BR accent " (#d97757)"
+Accent colour.
+.TP
+.BR mouse " (true)"
+Mouse clicks and scrolling in full\-screen views.
+.TP
+.BR naming " (verb)"
+How new sessions are named:
+.IR <agent>_<verb> " (" verb ") or " <agent>_<folder> " (" folder ),
+e.g.
+.I claude_ignite
+or
+.IR codex_px .
+.TP
+.BR tab_prefix " (empty)"
+Tab name prefix.
+Empty means
+.IR <agent>_ .
+.TP
+.BR agent " (claude)"
+Default agent for new sessions (an agent id;
+.B "claude agents"
+lists them).
+.BI host. alias .agent
+overrides it for one machine.
+.TP
+.BR agents " (all)"
+Whose sessions are listed everywhere:
+.BR all ,
+or a comma\-separated list of agent ids such as
+.BR claude,codex .
+.TP
+.BR wraps " (claude)"
+The agent the shell function stands in for.
+Its own flags and subcommands, piped calls and calls inside herdr panes go to
+it.
+install.sh sets it when
+.B \-\-name
+shadows an agent's program, or with
+.BR \-\-wraps .
+.TP
+.BR return_to_dashboard " (true)"
+Come back to the dashboard after detaching.
+.TP
+.BR show_hidden " (false)"
+Browser: show dot\-folders.
+.TP
+.BR show_ignored " (false)"
+Browser: show package and build folders.
+.TP
+.BR ignore " (empty)"
+Browser ignore\-list edits, for example
+.BR +data,\-build .
+.TP
+.BR browse_ttl " (600)"
+Seconds before a cached folder listing is fetched again.
+.TP
+.BR deep_search " (3)"
+Browser: folder levels indexed for search (0 turns it off).
+.TP
+.BR notify " (true)"
+.BR "claude watch" :
+notify when a session needs you.
+.TP
+.BR notify_done " (false)"
+.BR "claude watch" :
+also notify when a session finishes.
+.TP
+.BR watch_interval " (20)"
+.BR "claude watch" :
+seconds between checks.
+.TP
+.BR ssh_reuse " (0)"
+Keep a shared ssh connection open for N seconds (0 turns sharing off).
+.TP
+.BR wall_layout " (grid)"
+Wall layout:
+.BR grid ", " main ", " rows " or " cols .
+.TP
+.BR wall_max " (9)"
+Tiles per wall page.
+.TP
+.BR hook.pre_new " (empty)"
+Shell command run in the new pane before the agent starts (remote).
+.TP
+.BR hook.post_new " (empty)"
+Local command run after a session starts, with
+.BR CH_HOST ,
+.BR CH_DIR ,
+.B CH_NAME
+and
+.B CH_PANE
+set.
+.TP
+.BR update_repo " (empty)"
+GitHub
+.I owner/repo
+that publishes releases, for
+.BR self\-update .
+.TP
+.BR raycast_dirs " (~/.raycast\-scripts)"
+Raycast script folders, colon\-separated.
+.SS Per\-host, presets and keys
+.TP 22
+.BI host. alias .color
+Machine colour; assigned automatically once.
+.TP
+.BI host. alias .machine
+herdr machine label for that alias, when it differs from the alias.
+.TP
+.BI host. alias .dir
+Folder where the browser and
+.B claude new
+start.
+.TP
+.BI host. alias .args
+Default agent arguments on that host.
+.TP
+.BI host. alias .agent
+Default agent kind on that host.
+.TP
+.BI preset. name . field
+A preset field: host, dir, args, agent, worktree or prompt.
+.TP
+.BI key. action = key
+Dashboard key override.
+.TP
+.BI action. key = label | command
+Custom key: run
+.I command
+in a new herdr tab in the session's folder.
+.SH ENVIRONMENT
+.TP 22
+.B CC_SSH_HOST
+Target host; overrides the configuration (but not
+.BR \-\-host ).
+.TP
+.B CC_MACHINE
+Legacy: the herdr machine label, which doubles as the ssh host.
+.TP
+.B CC_DIR
+Default
+.B \-\-dir
+for
+.BR new .
+.TP
+.B CC_REFRESH
+Overrides
+.BR refresh .
+.TP
+.B CC_BROWSE_TTL
+Overrides
+.BR browse_ttl .
+.TP
+.B CC_SSH_REUSE
+Overrides
+.BR ssh_reuse .
+.TP
+.BR CC_SSH_BIN ", " CC_HERDR_BIN
+The ssh and herdr binaries to use.
+.TP
+.B CC_SSH_CONFIG
+ssh config file (default
+.IR ~/.ssh/config ).
+.TP
+.B CLAUDE_HERDR_CONFIG
+Configuration file path.
+.TP
+.B CLAUDE_HERDR_HISTORY
+History file path.
+.TP
+.B CLAUDE_HERDR_DEBUG
+.B 1
+logs commands to
+.IR debug.log ,
+like
+.BR \-\-debug ;
+a path logs there instead.
+.TP
+.BR XDG_CONFIG_HOME ", " XDG_CACHE_HOME ", " XDG_STATE_HOME
+Base folders for the files below.
+.TP
+.B NO_COLOR
+Turn colour off.
+.TP
+.B COLORFGBG
+Used by
+.B theme=auto
+to detect a light terminal when the terminal doesn't say its background
+(it's asked once a run, OSC 11, on a local tty only: not over ssh, nor
+inside tmux, screen, zellij or herdr).
+.TP
+.B HERDR_ENV
+Set inside herdr panes.
+There,
+.B claude
+is always the agent it stands in for
+.RB ( wraps ,
+Claude Code by default).
+.TP
+.B CLAUDE_HERDR_NO_PASSTHROUGH
+Set (to anything) to refuse handing calls to the wrapped agent; exits 97
+instead.
+The Raycast extension sets it.
+.TP
+.BR VISUAL ", " EDITOR
+Editor for
+.BR "settings edit" .
+.SH FILES
+.TP
+.I ~/.config/claude\-herdr/config
+Configuration.
+.TP
+.I ~/.cache/claude\-herdr/fleet.json
+The last poll of every machine.
+Offline machines show it, marked stale.
+.TP
+.I ~/.cache/claude\-herdr/status.json
+Counts written by
+.B claude watch
+and read by
+.BR "claude status" .
+.TP
+.I ~/.cache/claude\-herdr/*.cache
+Folder\-browser listings, one file per host.
+.TP
+.IR ~/.cache/claude\-herdr/hosts/ ", " cm/ ", " <agent>\-commands ", " debug.log
+The remote herdr path, ssh control sockets, the wrapped agent's subcommand
+list (e.g.
+.IR claude\-commands )
+and the debug log.
+.TP
+.I ~/.local/state/claude\-herdr/history.jsonl
+Sessions you started.
+Used by
+.BR history ,
+.B recent
+and
+.BR last .
+.TP
+.I ~/.ssh/config
+ssh aliases.
+.B "host add"
+appends to it, after making a backup.
+.TP
+.I ~/.config/herdr/config.toml
+herdr's configuration.
+.B "theme herdr \-\-apply"
+edits a marked block in it.
+.TP
+.I ~/.warp/tab_configs/claude_*.toml
+Warp tab configs, written by
+.BR shortcuts .
+.SH JSON OUTPUT
+These shapes are stable; the Raycast extension and
+.B self\-update
+rely on them.
+.TP
+.B ls \-\-json
+.nf
+{version, generated_at, hosts: [{alias, machine, color, address, reachable,
+  error, stale, fetched_at, latency_ms, sessions: [{host, name, label, display,
+  pane_id, tab_id, workspace_id, terminal_id, agent, status, status_since, cwd,
+  title, mark, hue, glyph, color, focused}]}]}
+.fi
+.TP
+.B status \-\-json
+.nf
+{total, working, blocked, done, idle,
+ hosts: [{alias, reachable, sessions, blocked, working}],
+ needs_you: [{host, name, display, title}], generated_at}
+.fi
+.TP
+.B host list \-\-json
+.nf
+[{alias, address, herdr, default, fleet, color}]
+.fi
+.TP
+.B recent \-\-json
+.nf
+[{host, dir, count, last, score}]
+.fi
+.TP
+.B history \-\-json
+.nf
+[{t, host, dir, name, agent, args, prompt, worktree}]
+.fi
+.TP
+.B preset ls \-\-json
+.nf
+[{name, host, dir, args, agent, worktree, prompt}]
+.fi
+.TP
+.B doctor \-\-json
+.nf
+{ok, warn, fail, sections: [{section, checks: [{status, label, text, fix}]}]}
+.fi
+.PP
+.B status
+is one of
+.BR working ,
+.B blocked
+(needs you),
+.B done
+(finished, not yet seen),
+.B idle
+or
+.BR unknown .
+Times are unix seconds.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+The command failed: no such session, unreachable host, failed doctor checks,
+and so on.
+.TP
+.B 2
+Usage error, unknown command, or a command that isn't built yet.
+.TP
+.B 127
+The wrapped agent is needed for a passthrough but isn't installed.
+.TP
+.B 97
+A passthrough was refused
+.RB ( CLAUDE_HERDR_NO_PASSTHROUGH ).
+.TP
+.B 130
+Cancelled.
+.SH EXAMPLES
+.TP
+Set up a machine and check everything:
+.nf
+claude host add b31 selene@10.0.0.49
+claude doctor
+.fi
+.TP
+Add a second machine to the dashboard:
+.nf
+claude host include gpu2
+claude
+.fi
+.TP
+Set a new machine up without questions (herdr, Node.js, two agents):
+.nf
+claude host setup box3 \-\-agents claude,codex \-\-yes
+.fi
+.TP
+Start a session with a first prompt, then four tiled ones from a preset:
+.nf
+claude new \-\-dir /srv/px \-m "fix the flaky tests"
+claude preset add train \-\-host gpu2 \-\-dir /srv/train \-\- \-\-model opus
+claude \-\-host gpu2 new @train \-\-tile 4
+.fi
+.TP
+Answer a question and send a follow\-up without attaching:
+.nf
+claude keys gpu2:ignite 1
+claude send ignite "now run the benchmarks"
+.fi
+.TP
+Script against the fleet:
+.nf
+claude ls \-\-json | jq \-r '.hosts[].sessions[] | select(.status=="blocked") | .host + ":" + .name'
+claude status \-\-short          # e.g. in a status bar
+.fi
+.SH SEE ALSO
+.BR herdr (1),
+.BR ssh (1),
+.BR ssh_config (5),
+.BR claude (1)
+.PP
+https://herdr.dev
+.SH NOTES
+The settings are documented in
+.IR docs/config.md ,
+the daemon in
+.IR docs/daemon.md ,
+in the source tree.

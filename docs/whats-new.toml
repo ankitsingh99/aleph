@@ -1,0 +1,566 @@
+# What's new: one entry per deploy, newest first. Built into aleph: the dashboard
+# shows the entries newer than the last one you saw (ui.whats_new), and
+# `aleph whats-new` prints them.
+#
+# `notes` are in plain words, for the card. `commits` are that deploy's commit
+# subjects (shown under "more"). tools/whats-new.sh starts an entry: the
+# commits since this file last changed, split between it and the showcase one.
+#
+# Notes about showcase mode go in whats-new-showcase.toml under the same id:
+# only a build with that feature carries them.
+
+[[entry]]
+id = "2026-10-26-f"
+date = "2026-10-26"
+title = "A quieter Inbox: outages that matter, finished turns your way"
+notes = [
+  "A machine that stops answering reaches the Inbox only after 30 seconds (inbox.down_grace) and only if an agent there was working or waiting on you — saying which and for how long. A quiet machine dropping, or this computer itself being offline, files nothing; what's gone is told once it's back. ssh's exit 255 now reads as \"unreachable — ssh couldn't connect\".",
+  "When it answers again, its outage row gets its end and what happened to the sessions there, and archives itself when nothing was lost (inbox.machine_back = close; lost says only what's gone; off says nothing). Drops of one machine on one day are one row.",
+  "Finished turns stay out of the Inbox by default (inbox.finished = none); unseen, unseen-long or all bring them back, one row a session a day.",
+  "Desktop notifications: questions, limits, problems with agents and long finished turns — never about a session on screen in a dashboard you're looking at (Aleph now hears when its terminal gains or loses focus). notify_done sends every finished turn.",
+  "Your old machine-down, back-up and finished items were archived once (A shows them; nothing deleted).",
+  "install.sh pulls the newest source first (a fast-forward; offline or with local changes it just builds what's there; --no-pull skips it).",
+]
+commits = [
+  "install.sh: pull the newest source first, optionally",
+  "Inbox and notifications: outages that matter, finished turns your way",
+]
+
+[[entry]]
+id = "2026-10-26-e"
+date = "2026-10-26"
+title = "Fleet in bands, the local network without internet, ctrl+enter"
+notes = [
+  "Fleet's board (z on the machines list) is now in bands: each machine across the screen with its CPU, memory and GPUs as meters and sparklines, its network, disks, usage today and who uses its GPUs, and its sessions right under it — state, this turn, model, folder and branch, the day's timeline, totals — with the agent's latest real output beneath each (never its input box). , orders each machine's sessions.",
+  "No internet but your machines still answer (a local network): the header says \"no internet · 2/3 machines answer\" instead of offline, and prompts to those machines go now instead of into the queue.",
+  "Focus passes ctrl+enter, ctrl+tab and every other chord to the agent as pressed (where the terminal reports them: Ghostty, kitty, WezTerm, iTerm2, foot); only Aleph's few own keys stay with Aleph. ui.keyboard = legacy turns it off.",
+]
+commits = [
+  "CLAUDE.md: Fleet's board, the approval board's marks",
+  "Turn cost: the alert's own read counts, even within the turn's second",
+  "No internet, machines on the network: not offline",
+  "Fleet's board in bands: a machine across, its sessions under it",
+  "Focus: ctrl+enter and every other chord reach the agent as pressed",
+]
+
+[[entry]]
+id = "2026-10-26-d"
+date = "2026-10-26"
+title = "Fleet's board, a tidier approval board, one Codex in plan limits"
+notes = [
+  "Fleet's board: maximise the machines list (z) and it becomes a tile per machine — CPU, memory and every GPU with their history, who uses the GPUs, network, disks, today's usage and a history chart — above one table of every session: its state, this turn, model, folder and branch, the day's timeline, tokens and cost, and under each its screen's latest line, live. , changes the order (needs you first, working first, most recent, by machine; fleet.board_order); ←→ or a click on a tile lights up one machine's sessions.",
+  "The approval board (ctrl+a): a question answered anywhere — here, in Focus, at the agent's own terminal, from the phone — leaves at once, and its Inbox item is archived on the spot.",
+  "Each row shows the agent, its session, the machine and how long it has been waiting, with what it asks underneath; the selected one is drawn as a card beside the list.",
+  "space marks several questions; y, n or a number then answers each of them, every one read again and checked first. esc drops the marks.",
+  "enter, or a click on a card, opens that session in Focus, typing into the agent to answer it there; leaving Focus brings the board back while others still wait.",
+  "approvals.group = same puts agents asking the same thing on one row, with one answer for them all (off by default).",
+  "Plan limits no longer show a second, weeks-old Codex (or any agent) beside the same account's current reading.",
+  "Moshi is off until you turn it on (aleph moshi install).",
+]
+commits = [
+  "Moshi: off until you turn it on",
+  "Plan limits: a slot from before accounts gives way to its account's",
+  "Approval board: answer in Focus, by enter or a click",
+  "smoke: Moshi's checks turn it on, the router's warms its machine",
+  "Approval board: answered ones leave at once; mark several; group the same",
+  "Fleet's board: the machines list maximised (z)",
+]
+
+[[entry]]
+id = "2026-10-26-c"
+date = "2026-10-26"
+title = "Calmer screens, a guarded esc, the palette in Focus"
+notes = [
+  "A theme's stars, rain and embers no longer land on an agent's screen in Focus, Tile, the preview or a question's card. Stars now fade in and out gently instead of blinking, and every frame reaches the terminal whole, so nothing flickers.",
+  "Typing into an agent, the first esc is held back: esc stops most agents' work. A toast and the status bar say so; press esc again within 3 seconds to send it (esc esc still works for Claude Code). ctrl+] or a click outside the pane gives the keys back to Aleph. focus.esc_guard = off turns this off.",
+  "ctrl+k opens the palette while you type into an agent too. In Fleet its first entry is Focus on the selected session; in Focus it offers Leave Focus and Keys back to Aleph.",
+  "The doctor no longer checks this computer (local) as if it were an ssh machine, so its DNS and ssh failures are gone.",
+  "Secret values (the OpenRouter key) never appear on a command line or on screen.",
+  "Raycast's Usage opens again after an update instead of crashing on its saved menu choices.",
+]
+commits = [
+  "Secrets: never on a command line, never on screen",
+  "Raycast Usage: survive the dropdown choices an older build cached",
+  "Doctor: local is this computer, never an ssh machine",
+  "Ambience: never on an agent's screen; stars fade, frames land whole",
+  "Focus: the first esc into an agent is held back; ctrl+k opens the palette",
+  "Palette: Focus on Fleet's selected session; in Focus, the ways out",
+]
+
+[[entry]]
+id = "2026-10-26-b"
+date = "2026-10-26"
+title = "Usage by account and project, and what every agent did"
+notes = [
+  "Usage knows whose account each request was on: two Claude logins, or two ChatGPT/Codex ones, on one machine or several, each with its own cost under the total (aleph usage accounts). Name them as you like: by email and plan, plan and id, or a nickname. Older records get a best guess, marked ≈.",
+  "A project is now one repo wherever you worked on it: the same git remote on two machines is one project, worktrees and subfolders fold into their repo (aleph usage projects).",
+  "Usage's filters combine: any period (the last 24 hours, 3, 7 or 30 days, 6 months, today, this week or month, all time, or your own dates on a calendar), agents with their accounts, machines and projects. Pick them from the chip bar (t a m p), click a chip's × to drop it, or type them (/).",
+  "Usage has tabs now — Overview, Breakdown, Trends, Turns & sessions, Insights — or one long page, or a pivot (L switches). The cost breaks up under the total by account, agent, machine, model or project; this period is drawn against the one before; the week's hours and the last 12 weeks as heatmaps; what a prompt and a session cost, the costliest prompts, plan value, the tools.",
+  "What every agent did, as a tree: each conversation's prompts (who sent them), turns, tool calls and subagents, with time, tokens and cost. G in Fleet shows it in the right panel, Focus shows it at the side, and Monitor › Timeline lists earlier conversations by project with the selected one's tree beside it. Repeats fold (\"Read + 7 more\"), finished prompts close to a line; the wheel scrolls it, a click opens or folds a row, w shows the words (read live, never kept). aleph timeline prints it.",
+  "Focus: scrolling an agent with the wheel holds still instead of flickering, and ctrl+q leaves Focus (esc goes to the agent).",
+  "Raycast: Usage takes every period and your own dates, one account or project, and gains Cost breakup & trends and Insights; a new Aleph Timeline command opens any conversation's tree.",
+]
+commits = [
+  "CLAUDE.md: control-stream input, the approval board, light themes' surfaces",
+  "Usage knows whose: every request carries the account it was made on",
+  "Usage by the hour, over any period, with lists and prompts",
+  "Focus: scrolling an agent holds still; ctrl+q leaves Focus",
+  "Projects: one repo is one project, wherever it was worked on",
+  "The timeline's data: what every agent did, as a tree",
+  "Usage filters: a chip bar, pickers, a calendar, typed; the chart kit",
+  "Usage's screens: tabs, one long page, or a pivot",
+  "The timeline in the dashboard: Fleet, Focus, Monitor › Timeline",
+  "Raycast: every period, accounts and projects, the breakup, insights; a Timeline",
+]
+
+[[entry]]
+id = "2026-10-26-a"
+date = "2026-10-26"
+title = "Native agent panes, an approval board, light themes that read"
+notes = [
+  "Focus types straight into the agent, like its own terminal: every key goes to it (ctrl+c interrupts it), a paste arrives as one paste. ctrl+], ctrl+q or a click outside gives the keys back to Aleph. focus.keys = aleph brings back the old way; enter_opens = attach opens herdr's own view instead.",
+  "The mouse wheel scrolls an agent's pane in Focus and Tile through its whole history (herdr's), or scrolls the agent itself when it takes the mouse; a badge says how far back. Clicks go to agents that take them.",
+  "ctrl+a, from any view: the approval board. Every agent waiting on you, its question exactly as it shows it, beside the list (or as cards: v). y approves, n denies, 1–9 picks any option (menus of 5–6 options too), Y approves every clear yes at once, enter opens it. It updates live, and a question answered elsewhere is marked and leaves. Before anything is sent the question is read again: if it changed, nothing goes; if it's on your deny list, it's yours to answer at the terminal.",
+  "Light themes, redone: near-white paper in each theme's colour, panels as cards, popups that float with a shadow, a selection you can see, and every colour readable (text 12:1, states 4.5:1).",
+  "Starting a session (n): / searches the agents, the ones the machine has first. More options' agent field searches as you type.",
+  "Shell panes work: opening one, sending it a message or keys, attaching to it (it said \"agent target … not found\" before).",
+  "A Mac's GPU shows in the stats (no sudo): its use, the memory it shares, renderer and tiler, its cores.",
+  "ctrl+k: \"usage b31\" or \"usage claude\" opens Usage for that machine or agent; x shows everything again.",
+  "Fleet: OpenCode's preview fits the panel instead of wrapping into pieces; x close shows in the footer. Cyberpunk has no falling rain.",
+]
+commits = [
+  "Shell panes open, take messages and keys; Cyberpunk without its rain",
+  "Focus types straight into the agent; the wheel scrolls a pane's history",
+  "Search the agents when starting a session, the machine's own first",
+  "Showcase test: Focus opens typing, ctrl+q before Aleph's keys",
+  "The approval board: every waiting agent's question, answered from one place",
+  "ctrl+k: usage for one machine or one agent",
+  "The waiting chip gives way: to the tab row's key hint, and to showcase's tagline",
+  "Light themes redone: paper, cards, popups that float, inks that read",
+  "A Mac's GPU in the stats, without sudo",
+]
+
+[[entry]]
+id = "2026-10-25-j"
+date = "2026-10-25"
+title = "Hermes installs faster and finishes"
+notes = [
+  "Hermes installs without its built-in browser and computer-use driver — hundreds of MB less to download. Add them any time with: hermes pm install agent-browser cua-driver.",
+  "A slow agent install is no longer cut off at 15 minutes: installs may run up to an hour (agents.install_timeout), and x on the install screen stops one yourself; i runs it again.",
+  "A failed install now says what actually went wrong (the installer's error), not \"left a note for Aleph\".",
+]
+commits = [
+  "Raycast README: the deep-link example's machine is b31 (a real machine's name was left URL-encoded)",
+  "package.sh: the new repository's commit starts no background gc, which packed its objects while zip read them (and broke the clean-up)",
+  "Hermes installs without its browser and computer-use driver (--skip-browser --skip-computer-use, --non-interactive): hundreds of MB less on top of the clone and the ffmpeg it always fetches; `hermes pm install agent-browser cua-driver` adds them later. A `curl … | bash -s -- --flag` install line is a script install (plain --flags only)",
+  "Agent installs: one limit, x to stop one, the real reason",
+]
+
+[[entry]]
+id = "2026-10-25-i"
+date = "2026-10-25"
+title = "OpenRouter: one key for your agents, its spend and its models"
+notes = [
+  "OpenRouter support: give Aleph your OpenRouter key once — setup's Agents step, or aleph secret set openrouter — and it's kept in your Keychain, never in a settings file.",
+  "Sessions of OpenCode, Kilo, Pi, OMP, Crush, Hermes and Maki get it as OPENROUTER_API_KEY, on this computer and your machines: it goes straight into the new pane through herdr's socket, never on a command line, on disk or in a log. When herdr's socket can't be reached, the key stays out and Aleph says so. openrouter.agents picks the agents.",
+  "Monitor › Usage has an OpenRouter card — spent today, this month and in all, credits left, your key's limit — and the header shows today's OpenRouter spend beside the rest; aleph usage (and --json) has it too.",
+  "Starting OpenCode, Kilo, Pi or OMP, the new-session form lets you pick any OpenRouter model — type to search, with each one's context length and price — and aleph new --openrouter qwen/qwen3-coder does the same.",
+]
+commits = [
+  "OpenRouter: the key as secret:openrouter, its settings, and its API read defensively",
+  "OPENROUTER_API_KEY in the sessions Aleph starts, through herdr's socket only",
+  "OpenRouter's spend in Usage, aleph usage and the header",
+  "Setup asks for the OpenRouter key, and keeps it out of its plan",
+  "OpenRouter models in the new-session form and aleph new --openrouter",
+  "Smoke checks: OpenRouter's key never in a log, its spend from the fake",
+  "A key pasted into Settings goes to the keystore, not the settings file",
+]
+
+[[entry]]
+id = "2026-10-25-h"
+date = "2026-10-25"
+title = "Installs that finish on a fresh Linux machine"
+notes = [
+  "A long, quiet install is left to finish: Hermes's clone runs to the end. Setup stops an installer only when it sits at a question it can't answer (a minute), or after 30 minutes in all.",
+  "What agents need on a bare Linux machine goes on first: uv for Kimi, the build tools for Letta (make, a C++ compiler, Python); cloudflared comes from Cloudflare's own download (it isn't in apt).",
+  "A failed install says the installer's own error, not Aleph's note about it.",
+  "Moving around the install list while agents install no longer stops Aleph (\"Stopped aleph\" in the shell).",
+  "After the installs, setup tidies up: npm's and uv's caches, build headers, broken links a failed install left behind — and says how much it freed. Installers run in a scratch folder, so nothing lands in the folder you started setup from.",
+]
+commits = [
+  "The dashboard is never stopped by a child writing to the terminal: \"[2]+ Stopped aleph\" while setup installed agents was SIGTTOU (an installer touching the tty's modes from the background) — SIGTTOU and SIGTTIN are ignored while Aleph has the screen, and put back on every hand-off",
+  "Installs that finish on a fresh Linux machine, then a tidy-up",
+  "Agent installers run in a scratch folder of their own, removed afterwards even when stopped: Crush's installer downloads into the folder it's run from and left archive-XXXXXX folders (one a half download) wherever setup was started",
+]
+
+[[entry]]
+id = "2026-10-25-g"
+date = "2026-10-25"
+title = "Themes once each, Cyberpunk light redone, random splashes"
+notes = [
+  "The theme gallery shows each theme once: press space to see every theme in its light version (◐ marks those that have one), and again for dark.",
+  "Cyberpunk (light) redone in the dark one's style for daylight: a concrete ground, red brackets and title tags, the yellow as the selection bar, teal data — readable everywhere.",
+  "ui.splash = random really is random now: it played the same splash every time on a Mac.",
+]
+commits = [
+  "ui.splash = random picks a new splash each start: macOS's clock ticks in microseconds, so the nanosecond seed was a multiple of 1000 and seed % 8 always 0 — the seed is spread first",
+  "the theme gallery lists each theme once: space turns every theme with a light version to it (◐ marks them), and back",
+  "cyberpunk-light redone: the dark one's HUD in daylight — a concrete ground (under the brightness limit, no exemption), red brackets and title tags, the yellow as the selection band with black ink, teal data, no rain; no more yellow cards",
+]
+
+[[entry]]
+id = "2026-10-25-f"
+date = "2026-10-25"
+title = "Agent installs that finish, an install log"
+notes = [
+  "Agent installs in setup finish on their own: each runs with no terminal, so a login question (Devin's) can't hold it up — after two minutes of silence, or ten in all, it's stopped and Aleph checks whether the agent is there anyway (then it says to run it once to log in).",
+  "What an agent's installer needs goes on first — Kiro's unzip, Hermes's git — without a password where sudo needs none; npm agents' own install scripts are allowed (npm 11 skipped them); herdr's integrations get the folder they ask for.",
+  "Every Apply writes an install log (~/.local/state/aleph/install/), and i on a failed item runs just that one again.",
+]
+commits = [
+  "proc::stream_watch: a child in its own session with no terminal (a prompt can't grab one), stopped — with everything it started — after a time limit or when it goes quiet",
+  "agent installs that finish by themselves: each in its own session with no terminal and CI/NONINTERACTIVE set, stopped after agents.install_timeout (600s) or agents.install_quiet (120s of silence: a login or a question), then checked — there anyway is installed, with what to do (run it once to log in); what an agent's installer needs goes on first (Kiro's unzip, Hermes's git), through sudo -n where it needs no password; npm lets the agent's own install scripts run (npm 11 held them back); herdr's integration gets the agent's folder it asks for; every apply has its install log (state/install/), and i runs one failed item again",
+]
+
+[[entry]]
+id = "2026-10-25-e"
+date = "2026-10-25"
+title = "Agents side by side, setup does more for you"
+notes = [
+  "Setup installs agents side by side, each with its own output, clock and tick (npm ones one at a time, so they don't trip over each other); progress bars update in place instead of filling the screen.",
+  "More of setup happens for you: a Nerd Font without Homebrew (or a word that it belongs on the computer your terminal runs on), missing tools through Homebrew or your system's package manager, Tailscale, cloudflared and moshi-hook from their steps, a new ssh key with nothing to type, and herdr's companion when herdr is on its way. The system row shows the processor, cores, memory and free disk; the ntfy topic shows when you ask.",
+]
+commits = [
+  "setup installs agents side by side: each its own aleph agents install with its own output, clock and tick — up to four at once, one per package manager (npm, uv, Homebrew) and machine; a progress bar or spinner redrawn updates its line in place",
+  "setup does more for you: a Nerd Font without Homebrew (the release, into your fonts folder) — or, when your terminal runs on another computer, says it goes there; missing tools queue through Homebrew or the system's manager (sudo asks, first), Tailscale through its script, the Mac-only ones hidden elsewhere; the system row with processor, cores, memory and free disk; a new ssh key with no passphrase (nothing to type); herdr's companion offered when herdr is queued; the ntfy topic shown on request; moshi-hook, Tailscale and cloudflared queued from their steps; Raycast on macOS only",
+]
+
+[[entry]]
+id = "2026-10-25-d"
+date = "2026-10-25"
+title = "Splashes redrawn, limits for every agent, palette pages, themes in showcase"
+notes = [
+  "Singularity and Pulsar redrawn as light. Singularity: a violet void breathing into a white-hot point, an eruption that fills the screen and cools into a cosmic web, galaxies forming at its knots — your machines the big ones. Pulsar: a neutron star in a Crab-like nebula, its beams sweeping a cone, a magnetar flare with a magenta shockwave, spinning up to a millisecond disc. The trace along the bottom is gone. Try aleph splash singularity --loop.",
+  "Usage limits are recognised for every agent Aleph runs — Gemini CLI, Antigravity, Copilot, Cursor, Qwen, Kimi, Amp, Droid, OpenCode, Cline and more, in each one's own words — and warnings, cooldowns and 'switched to a fallback model' no longer count as stopped.",
+  "ctrl+k opens Monitor's pages (type usage, timeline, services…) and each machine's own: type a machine's name and its GPU, CPU, memory, processes and network pages are right there.",
+  "Setup's ssh-agent row only asks about keys that have a passphrase, and loads each one with a press.",
+  "A setting your settings profile sets is now changed in that profile, so the change sticks (it used to go to aleph.toml, where the profile hid it).",
+]
+commits = [
+  "ssh-agent in setup: each key is asked whether it has a passphrase (ssh-keygen -y -P '', local, changes nothing); only those need the agent — they're offered inline, one 'load <key>' each, straight to ssh-add's own prompt with that key (a bare ssh-add only knew id_* names and failed); no passphrase anywhere: the row is fine",
+  "splash singularity: an emerging universe, drawn as light — the void a violet haze breathing and swirling in, foam falling to a white-hot point in a glow of gold and rose with diffraction spikes, a ring of the void closing on it with each quickening beat; its breath in, a flash, a fireball swelling past the screen's edges, billowing (lobes lit from inside) and filamented, cooling from white through gold and rose to violet behind its shock front, sparks thrown ahead; its afterglow draining into the cosmic web, wavering threads condensing between knots, its brightest lobes becoming nebulae with wisps and dark lanes; galaxies forming at the knots as log-spiral arms winding up and turning (some edge-on with a dust lane), your machines the big ones, named; the first stars in their classes' colours; the view pushing slowly in at the end. light.rs: an additive raster the cosmos scenes add light into — fine light at braille-dot resolution (points, splats, halos, rays, fields), gas a cell apiece drawn as a stipple where thin and in dots where dense, tone-mapped so bright light whitens; interleaved-gradient-noise dither (even tones, no lattice); value noise, fbm and ridges",
+  "splash light: hues kept, whitening only the brightest light (a hot core, not every bright line), the faintest gas in dots rather than a wall of stipple, the stipple's brightness held; singularity: your machines' galaxies kept whole on screen as the view pushes in, its nebulae a little softer; the gallery says what it shows now (a point in the foam, its fireball, the cosmic web, nebulae and spiral galaxies)",
+  "splash pulsar: a neutron star's lighthouse, drawn as light, the bottom trace and its readouts gone — it switches on in a flash, a ring of light thrown out; a blazing blue-white core with six diffraction spikes; its magnetosphere's dipole loops drawn out round it, turning with its magnetic axis (tilted from its spin axis, in 3D: the beams sweep a cone), an equatorial torus with wisps rippling out, faint jets with knots along the spin axis, all inside a wind nebula like the Crab's (a blue synchrotron haze clear round the star, a cage of rose, coral and amber filaments); two beams, white-hot cores in cones of cyan widening as they go, a trail behind each, sweeping a deep field of stars and lighting the stars they cross; once a turn one sweeps across you and the sky pulses white; the magnetar flare: a loop brightening magenta, thrown out twisting, sparks racing along the field lines, a shockwave ringing out that lights the filaments as it passes, the glitch; spun up to a millisecond pulsar its beams blur into a luminous disc in its equatorial plane, ripples of light running out across it, the torus blazing; it settles to a calm sweep. Your machines are stars the beams light, named for a while after. With the logo, the ℵ held with the beam sweeping on over it. Tests: a beam crosses you once a turn, a beam brighter along it than across, the disc spun up, the flare's magenta shockwave, nothing on the rows above the console at any size",
+  "splash pulsar: the flare reads — its shockwave a bright magenta ring three strands deep with only a thin glow behind it, the flash a moment shorter, the haze lit less after it; the sweep sampled finely only while its beams are distinct (a little quicker spun up)",
+  "limits: every harness in its own words — Claude Code, Codex, Gemini CLI (its dialog, errors and footer), Antigravity, Copilot, Cursor, Qwen, Kimi, Amp, Droid, OpenCode/Kilo, Cline, Hermes, Letta, Pi, Qoder, Command Code (read from their source or issues, 2026-10-25); never a warning, a cooldown or a notice that the agent carried on (fast limit, 85% used, switched to a fallback or auto, retry banners, high demand); more resets (reset in/after/on, retry in, refreshes in, cycle ends on), the reset cut before 'or'",
+  "e2e: the fake world drops HERDR_* — run from inside a herdr pane, the wrapper handed every call to the agent (the wraps check) and herdr calls could reach the real server; a smoke check for a setting the profile names",
+  "the palette opens Monitor's pages (usage, timeline, services, …) and each machine's own (b31 › GPU, Processes, …): typing a machine's name lists them",
+  "preflight: no needless return (clippy)",
+  "sshcfg: formatting",
+]
+
+[[entry]]
+id = "2026-10-25-c"
+date = "2026-10-25"
+title = "Your ssh keys, saved machines, saving without the terminal"
+notes = [
+  "Setup finds every ssh key in ~/.ssh, whatever it's called, and asks which one Aleph uses (or makes a new one when you apply, never over a key you have). Key setup copies that key, and tells ssh to offer it to the machine.",
+  "Machines already saved in herdr are recognised again (herdr 0.9.5 changed how it lists them), so setup no longer queues them to be saved twice — and a save that finds the machine there already counts as done.",
+  "Saving a machine in herdr runs on the install screen when nothing has to be installed there; only installing or updating herdr on a machine still asks in the terminal.",
+  "⇧⇥ goes back a step in setup (the footer says so now).",
+  "Once setup has finished, a bare aleph opens the dashboard — even when this computer is your only machine.",
+]
+commits = [
+  "a finished setup (quick start included) counts as a fleet: with only this computer, a bare aleph opens the dashboard instead of setup again",
+  "ssh keys: every private key in ~/.ssh is found whatever it's called (not just id_ed25519 / id_ecdsa / id_rsa); setup's step 1 lists them and asks which one Aleph uses (ssh_key = [ssh] key), or makes a new one when you apply (id_ed25519 if free, else aleph_ed25519 — a key you have is never touched); key setup copies that key and, when ssh wouldn't offer it, adds its IdentityFile for the machine to ~/.ssh/config (backup kept); machines setup adds get it too",
+  "setup's footer: ⇧⇥ previous step beside ⇥ next step",
+  "setup knows which machines herdr has saved: herdr 0.9.5 prints machine list --json as a bare array, which setup didn't read, so every machine looked unsaved and was queued again (herdr::saved_names reads any shape); a save queued for a saved machine drops out; saving runs on the install screen when herdr there needs nothing (only an install or update asks in the terminal), and 'already exists' is saved, not failed",
+]
+
+[[entry]]
+id = "2026-10-25-b"
+date = "2026-10-25"
+title = "Setup that installs for you, quick start, easy typing"
+notes = [
+  "Setup now collects everything it finds missing — herdr, a Nerd Font, terminal-notifier, an ssh key, your agents and their herdr integrations, the daemon — and installs it all at the end, on its own screen: the queue ticking along, what's running with its live output and a progress bar, a retry for anything that failed, and a celebration when it's done. Anything that needs your answer comes first, while you're there.",
+  "⚡ Quick start: in setup's first step, or `aleph setup --defaults` — no questions, it installs what this computer is missing and opens Aleph. On a new computer, `./install.sh --defaults` also installs Rust and herdr if they're missing.",
+  "Setup can make an ntfy topic with your own name (kept unguessable), and keeps ntfy, Slack and webhook addresses in the keychain instead of the settings file.",
+  "After a usage limit, pick which agents carry on by themselves, each with its own message.",
+  "Typing into an agent's pane: ctrl+q (or a click outside it) stops — no more reaching for ctrl+]. I in Fleet types straight into the selected session.",
+]
+commits = [
+  "setup installs from a queue, on its own screen: every install found missing — herdr here, Homebrew's tools, terminal-notifier and a Nerd Font, an ssh key, agents with their herdr integrations, the daemon — is marked into the plan and runs when you apply, never on the spot; Apply is a full-screen install screen: the queue with live states and times, the running item's card (what runs, a bar from its output's percentages or a sweep, the last lines of its output), ones that need you first and waiting for enter, a summary with r to retry the failed, and a celebration — the ℵ drawn in light, sparks, what went in — before enter opens Aleph. Quick start (⚡ in step 1, aleph setup --defaults): every default, what this computer is missing queued and applied at once. The default agent offers only agents that are there or queued",
+  "install.sh on a bare computer: no C linker (Xcode's command line tools), no Rust (rustup, as you) or no herdr (Homebrew, else its script) — it says so and installs each after a yes (--yes, --defaults); --defaults hands over to setup's quick start. package.sh: the zip is a fresh repository of what's committed, one commit by a neutral author",
+  "setup's ntfy: a topic with your own name (your words, then 8 random hex so nobody guesses it) beside the random one; ntfy, Slack and webhook URLs go to the keystore when setup writes them — aleph.toml says secret:<key>",
+  "after a usage limit: which agents carry on is a checklist (your default agent, Claude Code, Codex and the ones you have, or every agent), each with its own message — resume.<agent> ([automation.resume]), else limits.resume_prompt; other globs in limits.auto_resume are kept",
+  "typing into a pane is easy to leave: ctrl+q (mux_leave = [tile] leave, any keys you like; ctrl+] still works) or a click outside the pane; I in Fleet types straight into the selected session",
+]
+
+[[entry]]
+id = "2026-10-25-a"
+date = "2026-10-25"
+title = "Raycast setup that finishes, install commands for every agent"
+notes = [
+  "Setup's Raycast step no longer hangs: it builds and imports the extension, then stops by itself once Raycast has it (before, `ray develop` kept running until you pressed ctrl+c). npm's noise is gone too, and the extension's packages have no known vulnerabilities.",
+  "Every agent Aleph knows has an install command now: Oh My Pi, Devin, Antigravity, Mastra Code, Kiro, Grok, Hermes, Qoder, Maki, Muse, Command Code and Prime Agent use their official installers (with Homebrew or npm as the other way where they have one).",
+  "The examples in Aleph's docs and tests use neutral names — nothing personal ships with it. The Raycast extension's author is now aleph: import it once more (setup › Integrations › Raycast) and remove the old one.",
+]
+commits = [
+  "setup's Raycast step ends by itself: ray develop never exits (it watches for edits), so it runs quietly and is stopped with ctrl+c's SIGINT a few seconds after it says it built — the extension stays in Raycast; npm's audit, funding and deprecation chatter left out (here and in install.sh). proc::stream_until. npm audit: 0 vulnerabilities — @raycast/utils 2.3, eslint 10 with @raycast/eslint-config 2.2, esbuild's install script approved",
+  "agents: every one has an install command — omp, devin, agy (Antigravity), mastracode, kiro-cli, grok, hermes, qodercli, maki, muse, command-code their official installers (and Homebrew / npm / cargo alternatives where they have them), prime-agent's corrected; the tests' web-page-only agent is a stand-in now",
+  "personal data out of the code, tests and docs: machine names, users, LAN addresses, home folders, project and session names, the company's product, email and name become neutral ones of the same length and shape (b31, dex42, q7x, selene, alex, ox_color_check, PhotonMix), so every test still agrees; the Raycast extension's author is aleph",
+]
+
+[[entry]]
+id = "2026-10-24-q"
+date = "2026-10-24"
+title = "Cyberpunk's splashes, its light theme as cards, smooth splashes"
+notes = [
+  "Two new splashes, Cyberpunk's own. cyberdeck: a neural deck cold-booting — scanlines and glitch tears, the HUD frame tracing itself, diagnostics typing in red, your machines coming online as cyan uplinks, a big yellow sync counter that hiccups and completes, the ℵ snapping into focus out of red and cyan ghosts. neon: a city at night in the rain, your machines as neon signs stuttering on, traffic, a wet street mirroring it all, the ℵ lit as the biggest sign. The Cyberpunk themes play cyberdeck (ui.splash = theme); aleph splash neon plays the other.",
+  "Cyberpunk (light) as yellow cards on black: every panel a card of the yellow, black between them and over the header and footer, titles as black tags.",
+  "Splashes play on a steady 60 fps clock, so the cockpit no longer stutters.",
+]
+commits = [
+  "cyberpunk-light as yellow cards on black: every panel a card of the yellow (ui::panel fills it), the space between them, the tab row and the strips black with yellow text, popups one more card, unfocused tags and frames near-black; splashes play on a steady 60 Hz clock (a 25 ms wait after every draw made frames uneven: the cockpit stuttered), a late frame starting the next at once",
+  "splash cyberdeck: a neural interface booting, cyberpunk's own — a cursor blinking alone, the boot prompt typing; the screen powering on, a white-hot line opening into scanlines, rows torn sideways in red and cyan with static; the HUD's frame tracing itself from its cut corner in off-red, its labels typing in capitals; diagnostics typing in in red (an ICE alarm in crimson that clears, what needs you in yellow), your machines coming online as cyan readouts with their bars and sessions, a hex stream under them, a cortex trace; the yellow sync climbing in big quadrant digits, a hiccup, then complete: a flash, the brackets snapping tight, a yellow scan line sweeping down; it ends steady and live, one last glitch; with the logo the ℵ comes into focus in yellow out of its red and cyan ghosts",
+  "splash neon: a rain-soaked city at night, cyberpunk's other — a skyline coming up out of a blue-violet haze, far towers pale with it, the middle ones darker, their floors lined, the near ones black against it, windows lighting in warm yellow, cyan and magenta, masts with red beacons, fog drifting across, one tower above the rest; rain setting in, thin slanted streaks quicker and brighter near, splashing on a wet street that mirrors the city, rippling, each sign's light smeared down it; your machines' names as framed neon signs in yellow, cyan, magenta and red, dark tubes until each flickers on in its own turn with a glow round it, the city's own words down towers' edges; flying traffic in lanes, white headlights and red trails, the far lanes behind the near towers; it ends steady in the rain, one sign buzzing, a letter of it dead; with the logo the city dims and the ℵ lights over it as the biggest sign of all, its tubes flickering on band by band, yellow in a crimson glow, the rain catching its light",
+]
+
+[[entry]]
+id = "2026-10-24-p"
+date = "2026-10-24"
+title = "Cyberpunk light from the game's palette"
+notes = [
+  "Cyberpunk (light) redone from the game's own colours: its vivid yellow, with black structure on it the way the key art does it — a black band over the header and footer, panel titles as black HUD tags, the selected row black with yellow text — its UI's deep teal for working and live data, crimson ◆ for what needs you, blood red for down, and /// marks beside each frame's corner. Dark Cyberpunk's titles are red HUD tags.",
+  "On a light theme, anything that still wouldn't read on its own cell (a brand's colour, a pill's) is fixed as it's drawn.",
+  "The cockpit splash no longer stutters: splashes skip the per-cell readability pass, which also runs far cheaper now.",
+  "If another program leaves your terminal in raw mode (every line stepping further right), aleph puts it back before it prints.",
+]
+commits = [
+  "cyberpunk-light from the game's own palette: the yellow (#F2E600, the key art's), black structure on it — a black band over the header and footer, titles as black HUD tags, the selected row black with its text in yellow — its UI's deep teal for what works and for data, crimson ◆ for what needs you, blood red for down, olive and brown for the quiet parts, black brackets with /// beside each corner; cyberpunk's titles as red tags; on a light ground any glyph under 3:1 on its own cell is fitted (a table lookup per cell, a bounded cache); splashes get only the ground (their faint stars stay faint) and the brackets are scanned for only where there are brackets (the cockpit stuttered); the look is per thread under tests",
+  "a terminal some other program left in raw mode (lines stepping right) is put back before aleph prints: output processing and the line discipline restored at start",
+]
+
+[[entry]]
+id = "2026-10-24-o"
+date = "2026-10-24"
+title = "Light themes on a mid-tone paper, every theme its own personality"
+notes = [
+  "The light themes again: a mid-tone paper ground instead of a bright one (each keeps its tint; Cyberpunk a deeper gold), near-black text and deep colours on it, held to contrast floors a test checks. Colours used to be lightened on these grounds by mistake; now they're darkened.",
+  "Every theme has a personality of its own: its frames (Pulsar sharp with capitals, Event Horizon and Gruvbox heavy, Convergence and Dracula double-ruled, Tokyo Night cut corners), its spinner, state glyphs and colours, a living detail in the header (Pulsar's radio trace at 1.337 s, the Matrix's churning katakana, Dracula's moon, Convergence's signal crossing three nodes) and, with ui.ambience = rich, its own ambience (stars, digital rain, snow, embers, mist, bubbles, city rain).",
+  "The splash gallery's previews no longer show a dark block under every glyph. aleph splash theme plays your theme's own splash.",
+  "Installing on another computer: tools/package.sh makes a zip of a clean git repository; unzip it and run ./install.sh (--showcase for showcase mode, --raycast for the Raycast extension).",
+]
+commits = [
+  "splash_pages: each cell one column wide, as a terminal draws it (a browser draws halfwidth katakana from a CJK font, wider, and the frame came out skewed)",
+  "splash matrix: the code beneath it all — digital rain, halfwidth katakana, digits and letters falling in every other column, each its own speed, trail and churn, a white-green head over a fading trail; your machines' names decoded out of the rain, lit for a moment; déjà vu: a band of the rain repeating itself, twice, and a wave of light rippling across the columns, showing the code between the drops; the rain slowing (closed form) and freezing mid-fall; then the columns lock, the middle first, into ALEPH written large in lit code while the rest drains away; with the logo they lock into the ℵ instead, which turns to gold in place as the sparks swirl round it, the rain running on through it while it is held",
+  "splash convergence: many minds becoming one — a network waking across the screen, your machines its hubs (named), their sessions satellites round them in their states' colours, signals running along its edges; it learns: activity spreading out from the hubs, new nodes and edges appearing, attention arcs leaping between distant nodes in magenta, the pulses ever faster (closed form); then it converges, everything spiralling in (trails show the arms), hotter and denser, until it collapses into one brilliant core, spikes thrown out, and a ring of light goes out, gold, magenta, cyan; it ends on the core quietly thinking, slow rings and a few thoughts turning round it on threads; with the logo the core unfolds into the ℵ, held as a constellation with signals running along its strokes. Every splash is built now",
+  "splash matrix, convergence: tested with no fleet, one machine and a dozen with long names, on the smallest screen and the largest",
+  "splash convergence: the core sized to the screen (larger on a tall one, its slow rings too), and kept above the wordmark on a small one",
+  "light themes, again: mid-tone grounds (no glare; each its own tint, Cyberpunk a deeper gold) and inks held higher on them (text 9:1, muted 6:1, faint 4.5:1, every colour 5:1, lines 2.2:1); colours are fitted toward whichever of black or white stands out more (a mid-tone paper counted as dark, so inks were lightened), and a target out of reach goes as far as it can instead of staying put; splashes keep the background they draw on (the splash gallery's previews had a dark block under every glyph); aleph splash theme plays the theme's own",
+  "every theme a personality of its own (look.rs): its frames, titles, spinner, state glyphs and colours, a living ornament in the header and an ambience for ui.ambience = rich — singularity (soft panels, a point swelling, a star twinkling, a field of stars), pulsar (sharp instrument panels in capitals, a beam sweeping, a radio trace beating at its period, magenta ◉ for what needs you), event-horizon (heavy panels, a ring turning, dust falling inward), matrix (sharp, capitals, katakana churning, digital rain), convergence (double-ruled, a signal crossing three nodes, synapses firing), nord (frost, snow), dracula (double-ruled, a moon waxing, mist rising), gruvbox (heavy, a level meter, embers rising), tokyo-night (cut corners, a neon sign flickering, city rain), catppuccin (an arc going round, bubbles rising), solarized (sharp, still); the ambience is one particle system (falling, rising, twinkling) any theme configures; a test holds them apart",
+  "redistributable: tools/package.sh zips a clean git repository of the branch (its history, no remote, no build output or installed dependencies); install.sh --showcase builds showcase mode in, --raycast builds the Raycast extension; README: installing on a new computer from the zip, themes and splashes; CLAUDE.md: look.rs and tui/ambience.rs, every theme in the gallery's row; the two screenshots dropped at the top no longer tracked",
+]
+
+[[entry]]
+id = "2026-10-24-n"
+date = "2026-10-24"
+title = "Light themes you can read"
+notes = [
+  "Every light theme reworked: a toned paper ground instead of a glaring white (or yellow), each with its own tint, and deep inks on it: text, muted and faint text, every state and accent colour and the frame lines are held to readable contrast, whatever the palette says.",
+  "Machine and session colours, brand colours and an agent's own screen in previews and tiles are fitted to the theme's background too, and the machines' colours follow the theme the moment it changes (the gallery's live preview used to leave them in the old one).",
+]
+commits = [
+  "light themes reworked: toned grounds instead of near-white (Convergence periwinkle grey, Event Horizon sand, Matrix sage, Pulsar steel, Singularity lavender dusk, Latte and Solarized their darker canonical surfaces, Cyberpunk a deeper yellow); every ink held to a floor on a light theme or a theme's own ground (Pal::readable: text 11:1, muted 6:1, faint 4:1, every hue and state 4.5:1, frame lines visible), hue kept, lightness moved just enough; machine and session colours fitted the same way (Paper too) and made again whenever the theme changes (the gallery's live preview left them in the old theme's pastels); brand colours at 4.5:1 on light grounds (logo::fit_to); an agent's own screen (previews, tiles) fitted to the ground (ui::ink, xterm's 16 and 256 colours); a test holds every theme to it",
+]
+
+[[entry]]
+id = "2026-10-24-m"
+date = "2026-10-24"
+title = "Themes with a personality, and Cyberpunk"
+notes = [
+  "A new theme, cyberpunk: a neural interface's HUD. Electric yellow for what's yours (the selection, what needs you, as a ◆), off-red chrome, cyan for live data, on near-black, with HUD-bracket frames, titles in capitals, a glitching spinner, a data readout ticking in the header and a short glitch as you switch views. cyberpunk-light is the key art's yellow, in black ink.",
+  "Themes now go beyond colour: each paints its own background (ui.ground = terminal turns it off; auto, dark and light keep your terminal's), frames its panels its own way (ui.panels: rounded, sharp, heavy, double, cut or brackets), and has its own spinner, state colours and glyphs. Popups sit a shade above the background.",
+  "ui.ambience = rich adds a theme's ambience to empty space (cyberpunk's neon rain); subtle (the default) keeps one living detail; off keeps it still.",
+  "The splash follows the theme: ui.splash = theme is the new default. The theme gallery names each theme's splash and, when you've chosen a splash of your own, asks whether to switch; the splash gallery has it first.",
+]
+commits = [
+  "themes with a personality (src/look.rs): a theme frames its panels its own way (rounded, sharp, heavy, double, cut, HUD brackets — ui.panels), sets its titles, has its own spinner (ui.spinner = theme, the default), state colours and glyphs, a living detail in the header, a glitch between views, an ambience in empty space (ui.ambience = subtle / rich / off), the splash it pairs with (ui.splash = theme, the new default; the theme gallery names it and asks on keeping a theme while a splash of your own is set; the splash gallery's first row), and paints its own ground (ui.ground = theme / terminal; auto, dark and light keep the terminal's); ui::finish after every full-screen frame (the ground, the brackets' arms), ui::clear (popups a shade above the ground), machine and session colours fitted to a theme's ground. cyberpunk: electric yellow for the accent, the selection and what needs you (◆), off-red HUD chrome, cyan data, mint done, crimson down, on near-black; HUD brackets, titles in capitals, a glitching spinner, a hex readout in the header, neon rain; cyberpunk-light on the key art's yellow",
+  "the needs-you glyph is the theme's everywhere it means that (machine rows, the Inbox's waiting line, timelines, the tab badge's count)",
+]
+
+[[entry]]
+id = "2026-10-24-l"
+date = "2026-10-24"
+title = "Two new splashes: pulsar and event-horizon"
+notes = [
+  "pulsar: a neutron star turning, two beams sweeping like a lighthouse with a radio trace peaking at each pass, a magnetar flare with a spin glitch, then a spin-up until the beams blur into a disc. With the logo, the beam keeps sweeping over the ℵ.",
+  "event-horizon: a black hole close up: the stars bent around it, its disc brighter and bluer on the side coming toward you, faint jets, a star torn into a stream that flares as it hits, then crossing the horizon until only the photon ring is left. With the logo, sparks rise off the ring into the ℵ.",
+  "Both are in the splash gallery, aleph splash pulsar / event-horizon, and ui.splash = random.",
+]
+commits = [
+  "splash pulsar: a star keeping time — a neutron star turning, its dipole field's loops with it; two beams sweeping like a lighthouse's, the frame pulsing as one crosses you and a radio trace along the bottom peaking for each; a magnetar flare (a loop erupts, sparks along the field lines, a ring of light) with a spin glitch the trace shows; spinning up to a millisecond pulsar until the beams blur into a disc of light, then settling calm; your machines lit and named as the beams pass; with the logo, its beams go on sweeping over the held ℵ. scene.rs: Frame::new, scene() on any canvas, ismooth; splash_pages takes SPLASH_MS and SPLASH_SIZE",
+  "splash event-horizon: the point of no return — the stars behind a black hole bent aside, a far galaxy drawn into arcs and an Einstein ring; its shadow edged by the photon ring, the disc near edge-on with its far side lensed over and under the shadow, brighter and bluer coming toward you, dimmer and redder going away, its turbulence turning; faint jets; a star falling in, torn into a stream that swings beneath the shadow and flares where it hits the disc; then crossing the horizon, everything slowing and reddening as the shadow fills the screen, the photon ring the last light (with the logo, Hawking sparks rise from it into the ℵ); your machines named stars in the lensed sky",
+]
+
+[[entry]]
+id = "2026-10-24-k"
+date = "2026-10-24"
+title = "aleph outside ls: a bordered table with status"
+notes = [
+  "aleph outside ls draws a bordered table: machine, pid, agent, status (● working, or ○ idle and for how long), how long it's been up, CPU, memory, its folder, its conversation and its command. On a narrow terminal the command, then the conversation, make room.",
+  "Claude Code's spare background processes (bg-spare) are left out too, like its daemon and terminal hosts, and so are the Codex sandboxes the ChatGPT app runs its tools in.",
+]
+commits = [
+  "aleph outside ls: a bordered table — machine, pid, agent, status (● working: its CPU busy or its conversation written in the last 30 s; ○ idle and for how long), up, cpu, memory, folder, conversation, command; one capture line per machine for all its agents (the idle age of its conversation file now in every capture); out::table (rounded, faint rules, bold heads, flexible columns cut with …, optional ones go when narrow); TSV and --json carry the same; Claude Code's --bg-* processes (bg-spare, bg-pty-host) are helpers too",
+  "agents outside herdr: codex sandbox / debug (the ChatGPT app runs its tools in Codex's sandbox) are helpers, not sessions",
+]
+
+[[entry]]
+id = "2026-10-24-j"
+date = "2026-10-24"
+title = "aleph outside ls as a table"
+notes = [
+  "aleph outside ls is a table now: machine, pid, agent, user, how long it's been up and its command, under column heads. Piped, it's tab-separated.",
+  "Claude Code's own background processes (its daemon and the terminals it hosts) no longer show up as agents outside herdr, so x can't stop them by mistake. A real session running under one of them still shows.",
+]
+commits = [
+  "aleph outside ls: a table (machine, pid, agent, user, up, command under column heads, each machine in its colour; TSV when piped; --json has the user); Claude Code's background daemon (claude daemon run) and its terminal hosts (bg-pty-host) are helpers, not agents outside herdr — a session one of them hosts is still listed",
+]
+
+[[entry]]
+id = "2026-10-24-i"
+date = "2026-10-24"
+title = "The splash gallery"
+notes = [
+  "The splash gallery: every splash beside a live preview of the one you're on, playing over and over. Enter keeps it, p plays it full screen, and l turns the ℵ ending on or off. Open it from the palette (Splash gallery), from help's search, or with enter on ui.splash in Settings.",
+]
+commits = [
+  "splash gallery: every splash beside a live, looping preview of the one highlighted (random shows the one it picked, a screen too small says what it shows instead); enter keeps it (and the ℵ ending, when l changed it), p plays it full screen and comes back, l turns the ℵ ending on or off; the palette's Splash gallery, help's search (both galleries), enter on Settings' ui.splash; ui.splash_logo and ui.splash_hold apply to every splash; CLAUDE.md row for tui/splash/",
+]
+
+[[entry]]
+id = "2026-10-24-h"
+date = "2026-10-24"
+title = "Cosmic themes, the singularity splash, cost per turn, the journal"
+notes = [
+  "Six new themes, each with a light version: singularity (white-gold on a violet void), pulsar (cyan beams on blue-black), event-horizon (accretion amber on true black), matrix (phosphor green, with the states keeping their colours), matrix-mono (all green, states told apart by brightness) and convergence (synapse violet on indigo). Pick one in the theme gallery; setup previews each in its own colours.",
+  "A new splash, singularity: quantum foam and a grid bending toward a point, which erupts, cools into an afterglow and clumps into young galaxies, your machines the brightest and named. Set ui.splash = singularity, or random for a different one each time.",
+  "ui.splash_ms sets how long a splash plays (auto, or 1 to 8 s). aleph splash NAME plays one on its own, full screen: --loop repeats it for recording, --no-logo ends on the scene instead of the ℵ.",
+  "Agents running outside herdr: x stops one (after a yes), and enter reopens it inside herdr in the same folder and conversation, with its options. From the shell: aleph outside ls / stop / reopen.",
+  "Cost per turn: when a session finishes, the alert says what that turn took, like \"this turn: 412k tok · $1.20 · 6 min\", and so do the Inbox and Fleet's preview. Moshi's cards and the desktop banner too.",
+  "The session journal: a Markdown file a day of what each session did (prompts, final messages, files and diff stats, time, tokens and $). Open it from the palette (Journal: today) or J in the Inbox, ←→ for another day; aleph journal from the shell. journal.include picks what goes in, journal.dir where it lives.",
+]
+commits = [
+  "agents outside herdr: x stops one (after a yes, SIGTERM, waited for); enter reopens it in herdr — its folder, conversation id (its open session file, else the folder's newest, else the usage logs, else continue) and options captured first, the prompt never re-sent; the palette; aleph outside ls | stop | reopen",
+  "twelve cosmic themes: singularity, pulsar, event-horizon, matrix (phosphor, the states keep their colours), matrix-mono (all green), convergence, each with a -light version; the contrast test checks at-limit too; setup lists every theme and previews it in its own colours",
+  "splash scenes: src/tui/splash/ (scene.rs: normalised time, the ℵ gathered from a scene's own particles, the console line); singularity — foam and a grid bending to a point, the eruption, its afterglow clumping into young galaxies (your machines named), a young universe; ui.splash_ms (auto or 1–8 s, every kind stretches), ui.splash = random; aleph splash [NAME|random] [--loop] [--ms] [--no-logo] [--end]; splash_pages per scene (SPLASH_KIND)",
+  "events carry the agent's own session id (native): herdr's agent_session on new sessions, questions and finished turns, the hook's session_id / thread-id; written only when known, older lines still read",
+  "cost per turn: \"this turn: 412k tok · $1.20 · 6 min\" in the finished alert (every router sink; the desktop banner after its words), the Inbox's detail and Fleet's preview",
+  "cost per turn on Moshi's finished cards too: the card waits for its machine's usage on a thread of its own (never the hub's), then says \"this turn: …\" under where it ran",
+  "session journal: a Markdown file a day of what each session did (aleph journal [today|yesterday|-N|DATE] [--write] [--json] | path)",
+  "a turn's and a journal day's records are its own machine's: a home shared between machines (NFS on a cluster) showed one conversation under each, and counted it twice",
+  "the journal in the dashboard: palette Journal: today / yesterday and the Inbox's J open a day's file, styled and scrollable (←→ another day, r again and saved); today is put together as it opens; what's shown goes through the lens, money too",
+  "smoke: a finished turn's alert says what it took; the journal (a prompt in today's file with its secret masked, --json, journal.include, an empty day, journal.dir)",
+]
+
+[[entry]]
+id = "2026-10-24-g"
+date = "2026-10-24"
+title = "Multi-select, undo close, GPU owner"
+notes = [
+  "Mark sessions with space, then act on all of them: y approves every one that's asking (with each question's own yes; the rest are skipped and the toast says why), s sends one prompt, Q queues a task for each, x closes them. The hint line turns into an action bar while anything is marked.",
+  "Closing a session can be undone: it waits 5 seconds first (close.grace) while the agent keeps running, the row greys out, and u keeps it. The same grace holds from Raycast (Undo, ⌘Z), the web console (an Undo button) and the shell (aleph close --undo; --now closes at once).",
+  "GPU owner: Monitor's GPU table names the session each GPU process came from (◆ session), and the Fleet preview shows a session's GPU job.",
+]
+commits = [
+  "undo close: a close waits close.grace (5s; 0 = at once) while the agent keeps running, wherever it's asked — the dashboard greys the row \"closing in 5s · u undo\" and u keeps it (the selected one, else the last close; from any view while its toast says so; the palette too); aleph close prints how to undo (--undo [name], --now, --pending, --json); session.close answers {pending, deadline} (now: true at once) and session.close.undo keeps it",
+  "multi-select: with sessions marked (space), y approves every one that asks with its question's own yes option (those not asking, on approve_deny or without a clear yes are skipped, and the toast says how many and why), s sends one prompt to all (what b does with marks), Q queues the task for each (sent once it's free; tab in the send form too), x closes them all (after close.grace); an action bar replaces \"◉ N marked\": ◉ 3 marked · y approve · s send · Q queue · x close · esc clear",
+  "raycast: Close waits Aleph's grace — its toast counts it (\"Closing ignite in 5s · the agent runs until then\") with an Undo action (⌘Z) that calls session.close.undo; without a daemon the CLI waits the grace itself (close --yes --json), and the Undo is there from the first moment (close --undo)",
+  "web console: Close… on a session's page (control scope, remote control on for it) asks, then waits Aleph's grace with a snackbar that counts down — \"Closing ignite on b31 in 5s — the agent runs until then\" — and an Undo button (session.close.undo)",
+  "close confirms say the grace everywhere (Inbox X, Focus X, a machine's checklist): \"the pane closes in 5s (the agent runs until then; u keeps it)\"",
+]
+
+[[entry]]
+id = "2026-10-24-f"
+date = "2026-10-24"
+title = "Timelines, motion and alerts"
+notes = [
+  "Session timelines: g in Fleet turns each session row into a chart of its last hours (working, needs you, done, idle, at limit) under an hour axis, and Monitor › Timeline (t) shows every session by machine, ended ones too, with busy time and questions. The preview and Focus get a one-line strip. ui.timeline_hours sets how far back.",
+  "Row bars: each Fleet session row shows tokens a minute over the last half hour and how full its context window is (ui.row_bars).",
+  "Light motion, for everyone: a session that needs you breathes softly, and one that just finished shows ✓ finished for a moment. Only the text's colour moves (ui.motion = on, reduced, off).",
+  "ctrl+n, in any view: the alerts you missed since you last opened the Inbox, and the last 20 toasts. Enter goes to the session, r marks them read.",
+  "o on a session opens its folder in your editor (Cursor, VS Code or Zed; another machine's over Remote-SSH). The editor setting picks it, and aleph edit does it from the shell.",
+]
+commits = [
+  "light motion for every build, on by default (ui.motion = on / reduced / off): a Fleet row that needs you breathes softly, a session that just finished gets a tick (✓ finished, a band of light crossing it) for a moment; only the text's colour moves, never a background; reduced keeps the tick, NO_COLOR has none",
+  "open in editor: o in Fleet (or aleph edit) opens a session's folder in Cursor, VS Code, Zed or your own command — another machine's over Remote-SSH (Zed: ssh://); the editor setting picks it",
+  "session timelines: each session's states over the last hours (ui.timeline_hours, 6) — Fleet's rows with g (fleet.timeline) under an hour axis, the preview's strip, Monitor › Timeline (t: every session by machine, ended ones too, busy time and questions; + - hours, e ended, enter Focus), Focus's timeline; the hub writes the state log (states.tsv, 48 h, capped; one writer)",
+  "row bars: tokens a minute over the last half hour and the context window's fill, as a tiny sparkline and meter after each Fleet session's status (ui.row_bars = tokens,context / off); from the session's own logs (usage records' per-request tokens, kept as Live::recent); blank room without numbers, left out below a 96-column list, giving way to the timeline when it's tight",
+  "alerts: ctrl+n in every view (key.alerts) shows the alerts you missed — Inbox events since you last opened the Inbox — and the last 20 toasts with their times and levels (marked when they showed in Focus or Tile); enter goes to the session's row (or the Inbox), r marks them read, i the Inbox; in the help search and the palette",
+  "timelines: a paused machine's sessions aren't counted as seen (their stretches wait); a test pins the rows' lead to the width the axis assumes",
+]
+
+[[entry]]
+id = "2026-10-24-e"
+date = "2026-10-24"
+title = "Prompts, hand-offs and races"
+notes = [
+  "The prompt library: ctrl+p in the send box and the queue lists your saved prompts; @name and enter does the same, and @name works as a new session's first prompt too. {folder}, {host}, {task} and friends fill themselves in from the session, anything else is asked. ctrl+s saves what you've written as a new one. From the shell: aleph send b31:hunt @review, aleph prompt ls.",
+  "Hand-offs: h on a session hands its work to another agent. The agent writes a hand-off note first (or Aleph builds one from git and its screen, when it's at its limit or handoff.summary = aleph), then the new agent starts in the same folder with it. The old session stays. aleph handoff b31:hunt --to codex from the shell.",
+  "Race mode: ctrl+k › Start a race… sends one prompt to Claude Code and Codex (race.agents, up to 4) at once, each in a git worktree of its own, and Race <id> shows their diffs side by side as they work. aleph race \"…\", race ls, race show.",
+]
+commits = [
+  "the prompt library: saved prompts with {variables} (the session's dir, folder, host, agent, task filled in; the rest asked), ctrl+p or @name in the send box, the queue and a new session's prompt, ctrl+s saves what you wrote; aleph prompt; aleph send x @name --var k=v, aleph new -m @name",
+  "hand-offs: h in Fleet (or aleph handoff) hands a session's work to another agent — its own hand-off note (or Aleph's from git and its screen, as handoff.summary says, and when it's at its limit or silent), then a new session in the same folder with it",
+  "race mode: one prompt to 2–4 agents at once, each in a git worktree of its own from the same base commit; the dashboard's race view shows their diffs side by side, refreshed while open; aleph race, race ls, race show",
+]
+
+[[entry]]
+id = "2026-10-24-d"
+date = "2026-10-24"
+title = "Workspaces and the theme gallery"
+notes = [
+  "Saved workspaces: W shows them, and enter (or 1–9) takes you there: a tab and Monitor's sub-view, its layout, Fleet's filter and a machine, all at once. Press s in it to save where you are now, d twice to delete one. GPU watch, Standup and Sessions only are there to start with; aleph ui NAME opens one from the shell.",
+  "The theme gallery (ctrl+k › Theme gallery, or enter on Settings' theme or accent): Graphite, Paper, Nord, Catppuccin Mocha and Latte, Tokyo Night, Gruvbox, Dracula and Solarized Light beside the accents, and the whole dashboard repaints as you move. Enter keeps it, esc puts back what you had.",
+  "Your own theme: a [themes.NAME] table in aleph.toml (base = a theme to start from, then any colour as #rrggbb), then theme = NAME. It's in the gallery too.",
+]
+commits = [
+  "saved workspaces: W goes to a named place in the dashboard (a tab and Monitor's sub-view, its layout, Fleet's filter, a machine) or saves where you are; starters gpu-watch, standup, sessions; the palette, aleph ui NAME, aleph://open?workspace=",
+  "the theme gallery: nine themes (Graphite, Paper, Nord, Catppuccin Mocha and Latte, Tokyo Night, Gruvbox, Dracula, Solarized Light) and your own ([themes.<name>] in aleph.toml) beside the accents, repainting the dashboard live as you move; enter keeps, esc puts back",
+]
+
+[[entry]]
+id = "2026-10-24-c"
+date = "2026-10-24"
+title = "Settings profiles"
+notes = [
+  "aleph profile use demo, travel or work switches a whole set of settings at once, over your own; aleph profile off brings yours back. Your aleph.toml is never touched: a profile is its own file (profiles/NAME.toml), and the starters are written out the first time you use them, for you to change.",
+  "Make your own: aleph profile save NAME KEY… keeps settings as they are now, aleph profile set NAME KEY VALUE changes one, aleph profile show NAME compares it with yours.",
+  "The dashboard shows the profile in use as a ◆ chip in the header, and the palette (ctrl+k) switches profiles.",
+  "The daemon and every dashboard now pick up settings changes within seconds, without a restart.",
+]
+commits = [
+  "aleph profile: whole sets of settings at once (demo, travel, work, your own), layered over yours for every process; off brings yours back. The daemon and dashboards read the settings again when they change (Config::stamp); a header chip and palette entries",
+  "the daemon says which step holds its loop up",
+]
+
+[[entry]]
+id = "2026-10-24-b"
+date = "2026-10-24"
+title = "Backups, aleph:// links, and this card"
+notes = [
+  "aleph backup puts your settings, presets, history, notes and session memory in one file, and never a secret. aleph backup restore FILE shows each file and setting it changes, asks, and saves what it replaces first.",
+  "aleph:// links open a view or a session from Shortcuts, Stream Deck or a note (aleph://open?view=monitor, aleph://focus?session=b31:hunt). Links that start, send, approve, close or queue always ask first in a dialog; approve shows the session's screen. aleph url install sets them up, aleph url links lists them.",
+  "aleph ui monitor (or inbox, settings) opens the dashboard on that tab.",
+  "Layout mode (L): 1–4 maximise a panel instead of switching tabs; q and esc leave layout mode without quitting.",
+  "aleph settings shows long setting names in full.",
+  "This card: what changed since you last opened Aleph. ui.whats_new = off turns it off; aleph whats-new shows it again.",
+]
+commits = [
+  "aleph backup: settings, history, notes and session memory in one file, never a secret; restore shows what changes, asks, keeps this computer's secrets and saves what it replaces",
+  "aleph:// links: open a view or a session in a new tab; new, send, approve, close and queue confirm with a dialog every time (approve shows the screen); aleph url install registers an osacompile applet (or a .desktop file) carrying the daemon's PATH; aleph ui <view>",
+  "What's new: a card after an update with what changed (curated notes, commit subjects under more); aleph whats-new",
+  "layout mode takes its own keys first: 1–4 maximise (not the views), q and esc leave it (not the dashboard, not the view)",
+  "settings list: whole keys, a gap after each column",
+]

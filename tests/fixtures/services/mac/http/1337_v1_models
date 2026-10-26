@@ -1,0 +1,2 @@
+200
+{"object":"list","data":[{"id":"llama3.2-3b-instruct","object":"model","name":"Llama 3.2 3B Instruct Q8","version":"2","description":"","format":"gguf","settings":{"ctx_len":8192,"prompt_template":"<|begin_of_text|>{prompt}"},"parameters":{"temperature":0.7},"metadata":{"author":"MetaAI","tags":["3B"],"size":3420000000},"engine":"llama-cpp"},{"id":"gpt-4o","object":"model","name":"OpenAI GPT 4o","version":"1.1","format":"api","settings":{},"parameters":{},"metadata":{"author":"OpenAI","tags":["General"]},"engine":"openai"}]}

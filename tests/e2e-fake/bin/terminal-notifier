@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fake terminal-notifier for tests: records the call in $ST/log and succeeds.
+ST=${ST:?}; echo "terminal-notifier $*" >> "$ST/log"

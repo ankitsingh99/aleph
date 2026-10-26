@@ -1,0 +1,27 @@
+{
+  "id": "msg_7c2d",
+  "sessionID": "ses_5a1b",
+  "role": "assistant",
+  "mode": "build",
+  "variant": "high",
+  "path": {
+    "cwd": "/home/u/site",
+    "root": "/home/u/site"
+  },
+  "cost": 0.0213,
+  "tokens": {
+    "input": 6471,
+    "output": 149,
+    "reasoning": 56,
+    "cache": {
+      "write": 0,
+      "read": 128
+    }
+  },
+  "modelID": "claude-sonnet-4-5",
+  "providerID": "anthropic",
+  "time": {
+    "created": 1792659000000,
+    "completed": 1792659006000
+  }
+}

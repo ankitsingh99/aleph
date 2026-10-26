@@ -1,0 +1,14 @@
+{
+  "numStartups": 1,
+  "oauthAccount": {
+    "accountUuid": "9c1d0000-1111-4222-8333-0000000000a1",
+    "emailAddress": "u@work.example",
+    "organizationUuid": "0rg00000-1111-4222-8333-000000000001",
+    "organizationName": "Work Co",
+    "organizationType": "claude_team",
+    "billingType": "stripe_subscription",
+    "organizationRateLimitTier": "default_claude_max_20x",
+    "ccOnboardingFlags": { "seen": true }
+  },
+  "projects": { "/home/u/work": { "lastSessionId": "x" } }
+}

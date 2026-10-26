@@ -1,0 +1,10 @@
+  676 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter
+  801 /Applications/LM Studio.app/Contents/MacOS/LM Studio
+  802 /Applications/Ollama.app/Contents/Resources/ollama serve
+  803 /opt/homebrew/opt/python@3.12/bin/python3.12 -m mlx_lm.server --model mlx-community/Qwen2.5-7B-Instruct-4bit --port 8080
+  804 /Applications/Jan.app/Contents/MacOS/Jan
+  805 /Applications/GPT4All.app/Contents/MacOS/gpt4all
+  806 next-server (v15.1.0)
+  810 /Applications/Ollama.app/Contents/MacOS/Ollama
+  900 -zsh
+ 1060 /opt/homebrew/opt/redis/bin/redis-server 127.0.0.1:6379

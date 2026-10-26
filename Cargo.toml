@@ -1,0 +1,53 @@
+[package]
+name = "aleph"
+version = "2.0.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Aleph — one dashboard and CLI for coding agents (Claude Code, Codex, OpenCode, …) running in herdr across your machines: fleet, focus, analytics, presets, notifications and a daemon"
+license = "MIT"
+
+[[bin]]
+name = "aleph"
+path = "src/main.rs"
+
+[features]
+default = []
+# Showcase mode (demos): private data swapped for space references, a
+# scripted demo world, flair, recordings as MP4 and GIF. Release builds leave
+# it out entirely.
+showcase = ["dep:fontdue"]
+
+[dependencies]
+crossterm = "0.28"
+# poll(2) for the terminal's answer to a query (already built for crossterm)
+libc = "0.2"
+ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+serde_json = "1"
+unicode-width = "0.2"
+vt100 = "0.15"
+signal-hook = "0.3"
+toml_edit = "0.22"
+# signed, single-use action tokens (phone buttons), device tokens, Web Push
+sha2 = "0.10"
+hmac = "0.12"
+# the daemon's HTTP API and web console (plain http on loopback: tailscale
+# serve / cloudflared put https in front)
+tiny_http = { version = "0.12", default-features = false }
+# Web Push: VAPID (ES256, RFC 8292) and payload encryption (RFC 8291)
+p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa", "std"] }
+hkdf = "0.12"
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
+getrandom = "0.2"
+# the pairing QR code, drawn in the terminal
+qrcode = { version = "0.14", default-features = false }
+minisign-verify = "0.2"
+# showcase only: a recording's frames drawn with the system's monospace font
+# (MP4 and GIF, encoded by the ffmpeg already on the computer)
+fontdue = { version = "0.9", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

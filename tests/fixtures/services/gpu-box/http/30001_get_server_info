@@ -1,0 +1,2 @@
+200
+{"model_path":"Qwen/Qwen2.5-7B-Instruct","host":"127.0.0.1","port":30001,"context_length":32768,"mem_fraction_static":0.88,"tp_size":1,"version":"0.4.1.post5","status":"ready"}

@@ -1,0 +1,26 @@
+# A declaration for `aleph setup --apply` (tests/e2e-fake/smoke.sh).
+[ui]
+theme = "dark"
+accent = "claude"
+
+[notify]
+quiet = "23:00-08:00"
+
+[hosts.gpu2]
+tags = "gpu"
+
+[presets.pair]
+description = "Claude Code and Codex side by side"
+layout = "columns"
+[[presets.pair.panes]]
+agent = "claude"
+dir = "/srv/x"
+[[presets.pair.panes]]
+agent = "codex"
+dir = "/srv/x"
+
+[setup]
+machines = ["b31", "gpu2"]
+default = "gpu2"
+completions = true
+tour = "done"

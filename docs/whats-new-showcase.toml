@@ -1,0 +1,51 @@
+# What's new in showcase mode: notes only a build with the showcase feature
+# carries, added to whats-new.toml's entry with the same id.
+
+[[entry]]
+id = "2026-10-25-d"
+notes = [
+  "Themes work in showcase mode: it shows the theme you picked (the cockpit colours are an option, showcase.palette = cockpit). A setting your profile sets is now changed in that profile, so the change sticks.",
+]
+commits = [
+  "themes in showcase mode: showcase.palette = theme by default (cockpit is opt-in), the demo profile no longer pins cockpit, and keeping a theme in the gallery switches it; a setting the profile in use names is changed in that profile — before, the change went to aleph.toml and the profile hid it",
+]
+
+[[entry]]
+id = "2026-10-24-f"
+notes = [
+  "In showcase mode, a session that finishes gets its supernova instead of the light-motion tick, never both.",
+  "Names in Monitor › Timeline are masked too, ended sessions' included.",
+]
+commits = [
+  "showcase: the state log's session names are masked too (ended ones show in Monitor › Timeline); the keycast names W",
+]
+
+[[entry]]
+id = "2026-10-24-c"
+notes = [
+  "The autopilot tour: ctrl+t (or the palette's Showcase: start the tour) walks the dashboard by itself, view by view, with a caption for each; any key hands it back. showcase.tour = idle starts it after two minutes untouched. It only looks, never acts.",
+  "Story mode, in the demo world: every two minutes an agent asks for approval and a rule answers it, a machine drops and heals itself, a Codex limit hits and resets, and a big task finishes, through the Inbox, notifications and Raycast like the real thing.",
+  "Time warp: showcase.warp = 2, 5 or 10 runs the demo world faster, without it ever jumping.",
+  "Presenter sync: showcase.sync = on, and Raycast and the web console follow the session and view you have open in the dashboard.",
+  "The demo profile turns showcase mode on over your real fleet, with the cockpit palette and money hidden; aleph profile off puts it back as it was.",
+  "Aleph's own folders (backups, profiles) keep their names on a masked screen.",
+]
+commits = [
+  "showcase: the demo world's time warp and story mode",
+  "showcase: the autopilot tour",
+  "showcase: presenter sync, the daemon and the web console",
+  "raycast: follow the presenter (showcase builds)",
+  "showcase: Aleph's own folders (state, backups, journal, profiles) stay readable in paths",
+]
+
+[[entry]]
+id = "2026-10-24-b"
+notes = [
+  "Recordings become an MP4 and a GIF: stop one with ctrl+r and they render in the background (cockpit card or plain, showcase.video_frame); the .cast stays only with showcase.cast_keep, and a cast you render by hand always stays.",
+  "aleph showcase status no longer warns about the hub when it runs on this computer.",
+]
+commits = [
+  "showcase: recordings as MP4 and GIF",
+  "showcase render keeps a cast named by hand (only a stop's own goes)",
+  "showcase status: the hub on this computer, by either of its names, isn't another one",
+]

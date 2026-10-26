@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Fake cloudflared for tests: never reaches Cloudflare. Records every call in
+# $ST/log and answers like cloudflared 2025.8:
+#   --version · tunnel list --output json · tunnel create NAME ·
+#   tunnel route dns NAME HOST ($ST/cf_dns_exists: the record is there already)
+# Logged in when ~/.cloudflared/cert.pem exists; tunnels live in
+# $ST/cf_tunnels.json, credentials in ~/.cloudflared/<id>.json.
+ST=${ST:?}; echo "cloudflared $*" >> "$ST/log"
+T=$ST/cf_tunnels.json; [[ -f $T ]] || echo '[]' > "$T"
+D=$HOME/.cloudflared
+ID=6ff42ae2-765d-4adf-8112-31c55c1551ef
+nocert() {
+  echo "Cannot determine default origin certificate path. No file cert.pem in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp /etc/cloudflared /usr/local/etc/cloudflared]. You need to specify the origin certificate path by specifying the origincert option in the configuration file, or set TUNNEL_ORIGIN_CERT environment variable originCertPath=" >&2
+  exit 1
+}
+case $1 in
+  --version|version) echo "cloudflared version 2025.8.1 (built 2025-08-21-1356 UTC)"; exit 0;;
+  tunnel) shift;;
+  *) exit 0;;
+esac
+# global flags before the subcommand (--config X, --loglevel X)
+while [[ $1 == --* && $1 != --output ]]; do shift 2; done
+case $1 in
+  list)
+    [[ -f $D/cert.pem ]] || nocert
+    cat "$T";;
+  create)
+    [[ -f $D/cert.pem ]] || nocert
+    n=$2
+    if jq -e --arg n "$n" 'any(.[]; .name == $n)' "$T" >/dev/null; then
+      echo "failed to create tunnel: Create Tunnel API call failed: tunnel with name already exists" >&2; exit 1
+    fi
+    mkdir -p "$D"
+    printf '{"AccountTag":"0123456789abcdef","TunnelSecret":"ZmFrZQ==","TunnelID":"%s"}\n' "$ID" > "$D/$ID.json"
+    jq --arg n "$n" --arg id "$ID" '. + [{"id": $id, "name": $n, "created_at": "2026-10-22T06:00:00Z", "deleted_at": "0001-01-01T00:00:00Z", "connections": []}]' "$T" > "$T.n" && mv "$T.n" "$T"
+    printf 'Tunnel credentials written to %s/%s.json. cloudflared chose this file based on where your origin certificate was found. Keep this file secret. To revoke these credentials, delete the tunnel.\n\nCreated tunnel %s with id %s\n' "$D" "$ID" "$n" "$ID";;
+  route)
+    [[ -f $D/cert.pem ]] || nocert
+    h=${*: -1}
+    if [[ -f $ST/cf_dns_exists ]]; then
+      echo "Failed to add route: code: 1003, reason: Failed to create record $h with err An A, AAAA, or CNAME record with that host already exists." >&2; exit 1
+    fi
+    echo "2026-10-22T06:00:00Z INF Added CNAME $h which will route to this tunnel tunnelID=$ID" >&2;;
+  run) echo "fake cloudflared: a test must never run a tunnel" >&2; exit 1;;
+esac
+exit 0

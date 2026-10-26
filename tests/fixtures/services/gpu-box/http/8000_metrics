@@ -1,0 +1,12 @@
+200
+# HELP vllm:num_requests_running Number of requests currently running on GPU.
+# TYPE vllm:num_requests_running gauge
+vllm:num_requests_running{model_name="meta-llama/Llama-3.1-8B-Instruct"} 2.0
+# HELP vllm:num_requests_waiting Number of requests waiting to be processed.
+# TYPE vllm:num_requests_waiting gauge
+vllm:num_requests_waiting{model_name="meta-llama/Llama-3.1-8B-Instruct"} 1.0
+# HELP vllm:gpu_cache_usage_perc GPU KV-cache usage. 1 means 100 percent usage.
+# TYPE vllm:gpu_cache_usage_perc gauge
+vllm:gpu_cache_usage_perc{model_name="meta-llama/Llama-3.1-8B-Instruct"} 0.341
+vllm:e2e_request_latency_seconds_bucket{le="0.3",model_name="meta-llama/Llama-3.1-8B-Instruct"} 4.0
+vllm:e2e_request_latency_seconds_count{model_name="meta-llama/Llama-3.1-8B-Instruct"} 12.0

@@ -1,0 +1,4 @@
+200
+aphrodite:num_requests_running{model_name="mistralai/Mistral-7B-Instruct-v0.3"} 0.0
+aphrodite:num_requests_waiting{model_name="mistralai/Mistral-7B-Instruct-v0.3"} 0.0
+aphrodite:gpu_cache_usage_perc{model_name="mistralai/Mistral-7B-Instruct-v0.3"} 0.02

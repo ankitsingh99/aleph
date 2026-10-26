@@ -1,0 +1,14 @@
+[package]
+name = "logogen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Dev-only: renders Aleph's brand and logo SVGs into the PNGs and bitmaps the app and the Raycast extension ship. Never part of the aleph binary."
+
+# its own workspace: `cargo build` at the repo root never builds this
+[workspace]
+
+[dependencies]
+resvg = "0.45"
+# the version resvg already uses: indexed PNGs with alpha levels
+png = "0.17"

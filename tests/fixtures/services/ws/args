@@ -1,0 +1,15 @@
+    1 /sbin/init
+ 2101 /opt/llama.cpp/build/bin/llama-server -m /models/Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf -c 16384 --host 127.0.0.1 --port 8080 -ngl 99
+ 2202 ./koboldcpp-linux-x64-cuda1210 --model /models/Mistral-Nemo-12B-Instruct-Q5_K_M.gguf --port 5001 --usecublas --contextsize 8192
+ 2300 bash start_linux.sh
+ 2303 python server.py --api --listen --model Llama-3-8B-Instruct-exl2
+ 2404 /usr/local/bin/local-ai run --address 127.0.0.1:8081 --models-path /srv/localai/models
+ 2505 python3 main.py
+ 2606 /home/u/venv/bin/python3 /home/u/venv/bin/aphrodite run mistralai/Mistral-7B-Instruct-v0.3 --port 2242
+ 2707 /home/u/venv/bin/python /home/u/venv/bin/xinference-local --host 0.0.0.0 --port 9997
+ 2808 /usr/local/bin/llama-swap --config /etc/llama-swap.yaml --listen 127.0.0.1:9292
+ 2909 /usr/local/bin/trtllm-serve /engines/llama-3.1-8b-fp8 --port 8002 --backend pytorch
+ 3010 /usr/bin/python3 /usr/local/bin/jupyter-lab --no-browser --port 8888
+ 3111 java -jar /opt/app/app.jar
+ 3200 ollama run llama3.2
+ 3300 vllm bench serve --model meta-llama/Llama-3.1-8B-Instruct --port 8000

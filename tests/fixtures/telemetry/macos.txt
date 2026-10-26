@@ -1,0 +1,131 @@
+H	studio.local	Darwin 27.0.0	macOS 27.0
+C	10	Apple M4	100	16384
+L	 3.45 3.70 4.09 	
+M	MemTotal:	16777216
+M	MemAvailable:	4828240
+M	MemFree:	378704
+M	Cached:	3402640
+M	SwapTotal:	3145728
+M	SwapFree:	1630525
+U	643434
+N	lo0	1468796638	1468796638
+N	gif0	0	0
+N	stf0	0	0
+N	anpi1	13464	16528
+N	anpi0	0	0
+N	en3	0	0
+N	en4	6594	10674
+N	en1	0	0
+N	en2	0	0
+N	bridge0	0	0
+N	utun0	0	80
+N	ap1	0	0
+N	en0	68291454886	8966604783
+N	utun1	0	9672
+N	awdl0	4957331	15399989
+N	llw0	0	0
+N	utun3	0	9672
+N	utun4	0	9732
+N	nan0	0	1416
+N	utun5	0	0
+N	utun2	2932632733	282753008
+B	disk0	1258303128	913740216	
+T	1	root	0.4	15968	/sbin/launchd	Ss	50:49.87	0
+T	404	_windowserver	28.4	112832	/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer	Ss	825:04.77	1
+T	18506	alexandersmith	0.0	191920	/Applications/Arc.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser Helper (Renderer).app/Contents/MacOS/Browser Helper (Renderer)	S	0:04.42	97252
+T	61997	alexandersmith	0.0	36144	/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service)	S	12:08.17	61979
+T	16298	alexandersmith	21.6	705904	claude	S+	9:16.01	15559
+T	99700	alexandersmith	0.0	0	(git)	?+	0:00.00	16298
+J	1	4
+J	61997	19
+J	404	22
+J	18506	20
+J	16298	23
+W	1	root	/sbin/launchd
+W	404	_windowserver	/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer -daemon
+W	18506	alexandersmith	/Applications/Arc.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser Helper (Renderer).app/Contents/MacOS/Browser Helper (Renderer) --type=renderer --unsafely-treat-insecure-origin-as-secure=ht
+W	61997	alexandersmith	/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=gpu-process --gpu-recent-crash-count=0 
+W	16298	alexandersmith	claude
+X	none	
+D	/	482797652	13765072
+D	/System/Volumes/Data	482797652	230158216
+O	4
+K	2	claude
+K	9	codex
+E	1792611279
+c	14	6	80
+L	 3.45 3.70 4.09 	
+M	MemTotal:	16777216
+M	MemAvailable:	4833008
+M	MemFree:	402064
+M	Cached:	3404336
+M	SwapTotal:	3145728
+M	SwapFree:	1630525
+U	643435
+N	lo0	1468796638	1468796638
+N	gif0	0	0
+N	stf0	0	0
+N	anpi1	13464	16528
+N	anpi0	0	0
+N	en3	0	0
+N	en4	6594	10674
+N	en1	0	0
+N	en2	0	0
+N	bridge0	0	0
+N	utun0	0	80
+N	ap1	0	0
+N	en0	68291957094	8966669005
+N	utun1	0	9672
+N	awdl0	4957331	15399989
+N	llw0	0	0
+N	utun3	0	9672
+N	utun4	0	9732
+N	nan0	0	1416
+N	utun5	0	0
+N	utun2	2932703128	282779630
+B	disk0	1258304616	913747400	
+T	1	root	0.0	15968	/sbin/launchd	Ss	50:49.88	0
+T	404	_windowserver	16.3	112864	/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer	Ss	825:05.00	1
+T	18506	alexandersmith	0.0	191920	/Applications/Arc.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser Helper (Renderer).app/Contents/MacOS/Browser Helper (Renderer)	S	0:04.42	97252
+T	61997	alexandersmith	0.0	36144	/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service)	S	12:08.17	61979
+T	16298	alexandersmith	18.8	707728	claude	S+	9:16.25	15559
+X	none	
+E	1792611280
+c	15	6	80
+L	 3.45 3.70 4.09 	
+M	MemTotal:	16777216
+M	MemAvailable:	4701696
+M	MemFree:	305536
+M	Cached:	3405552
+M	SwapTotal:	3145728
+M	SwapFree:	1630525
+U	643436
+N	lo0	1468796638	1468796638
+N	gif0	0	0
+N	stf0	0	0
+N	anpi1	13464	16528
+N	anpi0	0	0
+N	en3	0	0
+N	en4	6594	10674
+N	en1	0	0
+N	en2	0	0
+N	bridge0	0	0
+N	utun0	0	80
+N	ap1	0	0
+N	en0	68292258498	8966713306
+N	utun1	0	9672
+N	awdl0	4957331	15399989
+N	llw0	0	0
+N	utun3	0	9672
+N	utun4	0	9732
+N	nan0	0	1416
+N	utun5	0	0
+N	utun2	2932744815	282795665
+B	disk0	1258304680	913749632	
+T	1	root	0.0	15872	/sbin/launchd	Ss	50:49.88	0
+T	404	_windowserver	26.9	112864	/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer	Rs	825:05.26	1
+T	18506	alexandersmith	0.0	191920	/Applications/Arc.app/Contents/Frameworks/ArcCore.framework/Helpers/Browser Helper (Renderer).app/Contents/MacOS/Browser Helper (Renderer)	S	0:04.42	97252
+T	61997	alexandersmith	0.0	36144	/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service)	S	12:08.17	61979
+T	16298	alexandersmith	42.9	707744	claude	S+	9:16.58	15559
+X	none	
+E	1792611281

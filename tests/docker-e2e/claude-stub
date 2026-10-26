@@ -1,0 +1,13 @@
+#!/bin/bash
+# Stub Claude Code for the docker e2e: no network, no account. It sets a
+# terminal title (herdr shows it as the session title) and echoes what it's sent.
+case $1 in
+  --version) echo "2.1.0 (Claude Code stub)"; exit 0 ;;
+  --help) printf 'Usage: claude [options]\n\nCommands:\n  mcp  stub\n'; exit 0 ;;
+esac
+printf '\033]0;stub: waiting for prompts\007'
+echo "✻ stub claude in $PWD (args: $*)"
+while IFS= read -r line; do
+  echo "got: $line"
+  printf '\033]0;stub: %s\007' "$line"
+done

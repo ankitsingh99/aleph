@@ -1,0 +1,4 @@
+PID   PPID  COMMAND
+    1     0 init
+  412     1 ollama
+  500     1 sh

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Fake tailscale for tests: never touches a real tailnet. Records every call
+# in $ST/log and answers like tailscale 1.76:
+#   version · status --json (a connected tailnet; $ST/ts_down: logged out)
+#   serve [--bg] [--https=N] [--set-path=P] <target> [off] · serve status --json
+# The serve config lives in $ST/ts_serve.json, shaped like tailscaled's
+# (TCP / Web / Handlers / Proxy). $ST/ts_denied: serve says "Access denied",
+# like Linux without an operator. TS_VERSION / TS_NAME override.
+ST=${ST:?}; echo "tailscale $*" >> "$ST/log"
+S=$ST/ts_serve.json; [[ -f $S ]] || echo '{}' > "$S"
+NAME=${TS_NAME:-mbp.tail1234.ts.net}
+case $1 in
+  version)
+    printf '%s\n  tailscale commit: 0123456789abcdef0123456789abcdef01234567\n  other commit: fedcba9876543210fedcba9876543210fedcba98\n  go version: go1.23.4\n' "${TS_VERSION:-1.76.6}";;
+  status)
+    if [[ -f $ST/ts_down ]]; then
+      echo '{"Version":"1.76.6-t0123456789","BackendState":"NeedsLogin","AuthURL":"","Self":{"DNSName":"","Online":false}}'
+      exit 0
+    fi
+    cat <<J
+{
+  "Version": "${TS_VERSION:-1.76.6}-t0123456789",
+  "TUN": true,
+  "BackendState": "Running",
+  "HaveNodeKey": true,
+  "AuthURL": "",
+  "TailscaleIPs": ["100.101.102.103", "fd7a:115c:a1e0::1"],
+  "Self": {
+    "ID": "nFake1CNTRL",
+    "PublicKey": "nodekey:0000000000000000000000000000000000000000000000000000000000000000",
+    "HostName": "${NAME%%.*}",
+    "DNSName": "$NAME.",
+    "OS": "macOS",
+    "UserID": 123,
+    "TailscaleIPs": ["100.101.102.103", "fd7a:115c:a1e0::1"],
+    "Online": true,
+    "Capabilities": ["HTTPS", "https", "https://tailscale.com/cap/funnel-ports?ports=443,8443,10000"],
+    "CapMap": {"https": null, "https://tailscale.com/cap/funnel-ports?ports=443,8443,10000": null}
+  },
+  "MagicDNSSuffix": "${NAME#*.}",
+  "CurrentTailnet": {"Name": "me@example.com", "MagicDNSSuffix": "${NAME#*.}", "MagicDNSEnabled": true},
+  "Peer": {},
+  "User": {"123": {"ID": 123, "LoginName": "me@example.com", "DisplayName": "Me"}}
+}
+J
+    ;;
+  serve)
+    shift
+    [[ $1 == status ]] && { cat "$S"; exit 0; }
+    [[ $1 == reset ]] && { echo "fake tailscale: Aleph must never reset the whole serve config" >&2; exit 1; }
+    [[ -f $ST/ts_denied ]] && { printf 'Access denied: serve config denied\n\nUse '"'"'sudo tailscale serve'"'"'.\nTo not require root, use '"'"'sudo tailscale set --operator=$USER'"'"' once.\n' >&2; exit 1; }
+    port=443; path=/; target=; off=0
+    for a in "$@"; do
+      case $a in
+        --bg|--yes) ;;
+        --https=*) port=${a#--https=};;
+        --set-path=*) path=${a#--set-path=};;
+        off) off=1;;
+        -*) echo "flag provided but not defined: $a" >&2; exit 2;;
+        *) target=$a;;
+      esac
+    done
+    k="$NAME:$port"
+    if (( off )); then
+      jq --arg k "$k" --arg p "$path" --arg port "$port" '
+        del(.Web[$k].Handlers[$p])
+        | if ((.Web[$k].Handlers // {}) | length) == 0 then del(.Web[$k]) | del(.TCP[$port]) else . end
+        | if ((.Web // {}) | length) == 0 then del(.Web) else . end
+        | if ((.TCP // {}) | length) == 0 then del(.TCP) else . end' "$S" > "$S.n" && mv "$S.n" "$S"
+      exit 0
+    fi
+    [[ -n $target ]] || { echo "error: a target is required" >&2; exit 1; }
+    case $target in [0-9]*) target="http://127.0.0.1:$target";; esac
+    jq --arg k "$k" --arg p "$path" --arg t "$target" --arg port "$port" \
+      '.TCP[$port] = {"HTTPS": true} | .Web[$k].Handlers[$p] = {"Proxy": $t}' "$S" > "$S.n" && mv "$S.n" "$S"
+    printf 'Available within your tailnet:\n\nhttps://%s%s\n|-- proxy %s\n\nServe started and running in the background.\nTo disable the proxy, run: tailscale serve --https=%s off\n' "$NAME" "$( [[ $port == 443 ]] || echo ":$port")" "$target" "$port";;
+esac
+exit 0

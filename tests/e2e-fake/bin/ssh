@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Fake ssh. Per-host behaviour from $ST/mode_<host>:
+#   ok | auth | password | dns | refused | hostkey | changed | timeout |
+#   dropbuild (the link dies during a `cargo build`)
+# `sh -s` / `sh -c` run locally with HOME=$RHOME (the fake remote home) and the
+# fake herdr on PATH, with FAKE_HOST set so it knows which machine it's on;
+# $ST/aleph_<host> puts aleph on that PATH too. `-N -L local:remote` links
+# local → remote (a socket forward) until it's killed.
+ST=${ST:?}; echo "ssh $*" >> "$ST/log"
+HERE=$(cd "$(dirname "$0")" && pwd)
+[[ $1 == -V ]] && { echo "OpenSSH_9.8p1 (fake)" >&2; exit 0; }
+if [[ $1 == -G ]]; then
+  h=$2; f=$ST/G_$h
+  if [[ -f $f ]]; then cat "$f"; else printf 'hostname %s\nuser tester\nport 22\nidentityfile ~/.ssh/id_rsa\nidentityfile ~/.ssh/id_ed25519\nproxyjump none\n' "$h"; fi
+  exit 0
+fi
+none=0; batch=0; args=(); fwd=; nocmd=0
+while (( $# )); do case $1 in
+  -o) [[ $2 == PreferredAuthentications=none ]] && none=1; [[ $2 == BatchMode=yes ]] && batch=1; shift 2;;
+  -L) fwd=$2; shift 2;;
+  -N) nocmd=1; shift;;
+  -T|-t|-tt) shift;; -*) shift;; *) args+=("$1"); shift;; esac; done
+host=${args[0]}; cmd=${args[*]:1}
+mode=$(cat "$ST/mode_$host" 2>/dev/null || echo ok)
+case $mode in
+  dns) echo "ssh: Could not resolve hostname $host: Name or service not known" >&2; exit 255;;
+  refused) echo "ssh: connect to host $host port 22: Connection refused" >&2; exit 255;;
+  hostkey) echo "Host key verification failed." >&2; exit 255;;
+  changed) echo "@@@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@@@" >&2; exit 255;;
+  timeout) sleep 60; exit 255;;
+  slow) sleep 3;;
+  # flap: every other connection fails (a link that comes and goes)
+  flap) n=$(cat "$ST/flap_$host" 2>/dev/null || echo 0); echo $((n + 1)) > "$ST/flap_$host"
+        (( n % 2 == 0 )) && { echo "ssh: connect to host $host port 22: Network is unreachable" >&2; exit 255; };;
+esac
+if (( none )); then
+  [[ $mode == password ]] && echo "tester@$host: Permission denied (password,keyboard-interactive)." >&2 || echo "tester@$host: Permission denied (publickey,password)." >&2
+  exit 255
+fi
+if [[ $mode == auth || $mode == password ]]; then
+  (( batch )) && { echo "tester@$host: Permission denied (publickey,password)." >&2; exit 255; }
+fi
+RH=${RHOME:-$ST/../rhome}
+# -N -L local:remote (a forward of herdr's socket, sock.rs / listen.rs): the
+# local end is a symlink to the remote socket — on a fake machine, the fake
+# socket server's (fakesock.sh) — for as long as this "connection" lives
+if [[ -n $fwd ]] && (( nocmd )); then
+  lp=${fwd%%:*} rp=${fwd#*:}
+  [[ -S $rp ]] || echo "channel 2: open failed: connect failed: No such file or directory" >&2
+  rm -f "$lp"; ln -s "$rp" "$lp" || { echo "unix_listener: cannot bind to path $lp" >&2; exit 255; }
+  trap 'rm -f "$lp"; kill $sp 2>/dev/null; exit 0' TERM INT HUP
+  sleep 86400 & sp=$!; wait $sp; rm -f "$lp"; exit 0
+fi
+# a bare machine ($ST/bare_<host> lists the tools it has, e.g. "node npm"; empty:
+# none): its own home, and on its PATH only those fakes, curl (so the real one is
+# never reached), the system's /usr/bin:/bin, and herdr once `herdr machine add`
+# put it there ($ST/herdr_on_<host>) — no herdr, no agents, no node until then
+BIN=$HERE
+if [[ -f $ST/bare_$host ]]; then
+  RH=${RHOME:-$ST/../rhome}_$host; mkdir -p "$RH"
+  BIN=$ST/bbin_$host; rm -rf "$BIN"; mkdir -p "$BIN"
+  for t in curl fakeshell uname hostname $(cat "$ST/bare_$host"); do ln -sf "$HERE/$t" "$BIN/$t"; done
+  [[ -f $ST/herdr_on_$host ]] && ln -sf "$HERE/herdr" "$BIN/herdr"
+fi
+# aleph on this machine's PATH: $ST/aleph_<host> (this build with the
+# machine's own HOME, env.sh's rbin); the machine's folders, never this one's
+P="$BIN:/usr/bin:/bin"; [[ -f $ST/aleph_$host && -n ${ALEPH_FAKE_RBIN:-} ]] && P="$ALEPH_FAKE_RBIN:$P"
+export XDG_CACHE_HOME= XDG_STATE_HOME= XDG_DATA_HOME=
+# the services probe reads a simulated machine from $ST/svc_<host> (see reset.sh)
+SVC=; [[ -d $ST/svc_$host ]] && SVC=$ST/svc_$host
+# dropbuild: the link dies in the middle of a `cargo build` (aleph daemon deploy)
+if [[ $mode == dropbuild && $cmd == "sh -s" ]]; then
+  script=$(cat)
+  if [[ $script == *"cargo build"* ]]; then
+    echo "   Compiling serde v1.0.228"; echo "Connection to $host closed by remote host." >&2; exit 255
+  fi
+  printf '%s\n' "$script" | env HOME="$RH" SHELL="$HERE/fakeshell" FAKE_HOST="$host" ST="$ST" CCH_SYS_DIRS= PATH="$HERE:/usr/bin:/bin:/usr/sbin:/sbin" sh -s
+  exit $?
+fi
+case $cmd in
+  true) exit 0;;
+  # CCH_SYS_DIRS= keeps the agent probe out of this computer's /opt/homebrew/bin etc.
+  "sh -s") exec env HOME="$RH" SHELL="$HERE/fakeshell" FAKE_HOST="$host" ST="$ST" CCH_SYS_DIRS= ALEPH_SERVICES_FIXTURES="$SVC" PATH="$P:/usr/sbin:/sbin" sh -s;;
+  *"herdr server"*) touch "$ST/up_$host"; exit 0;;
+  # the fake login shell: chan::PATH_PRELUDE's `$SHELL -lc` must not pick up
+  # this computer's /opt/homebrew/bin or /usr/local/bin (the real herdr, tailscale);
+  # nor may `sh -lc …` (--via, connect: macOS's /etc/profile puts them first)
+  *) [[ $cmd == "sh -lc "* ]] && cmd="sh -c ${cmd#sh -lc }"
+     exec env HOME="$RH" SHELL="$HERE/fakeshell" FAKE_HOST="$host" ST="$ST" PATH="$P" sh -c "$cmd";;
+esac

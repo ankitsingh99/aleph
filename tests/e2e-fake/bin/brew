@@ -1,0 +1,18 @@
+#!/bin/sh
+# Fake Homebrew: logs and refuses, so no test can reach the real one. With
+# $ST/brew_ok, `brew install …` pretends to install (downloads with a
+# progress bar, a pour) — the install screen's demo.
+echo "brew $*" >> "${ST:?}/log"
+if [ -e "$ST/brew_ok" ] && [ "$1" = install ]; then
+  pkg=$(for a in "$@"; do :; done; echo "$a")
+  echo "==> Fetching downloads for: $pkg"
+  for p in 8 21 37 52 66 79 91 100; do
+    printf '######%s %s.0%%\n' "$(printf '%*s' $((p / 4)) '' | tr ' ' '#')" "$p"
+    sleep 0.35
+  done
+  echo "==> Installing $pkg"
+  sleep 0.6
+  echo "🍺  $pkg was successfully installed!"
+  exit 0
+fi
+echo "fake brew: not installing anything" >&2; exit 1

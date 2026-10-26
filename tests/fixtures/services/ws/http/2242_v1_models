@@ -1,0 +1,2 @@
+200
+{"object":"list","data":[{"id":"mistralai/Mistral-7B-Instruct-v0.3","object":"model","created":1736700000,"owned_by":"pygmalionai","root":"mistralai/Mistral-7B-Instruct-v0.3","parent":null,"max_model_len":32768,"permission":[]}]}

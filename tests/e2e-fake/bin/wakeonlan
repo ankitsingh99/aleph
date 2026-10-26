@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Fake wakeonlan: records the MAC it was asked to wake (nothing is sent).
+echo "wakeonlan $*" >> "${ST:?}/log"
+echo "Sending magic packet to 255.255.255.255:9 with $1"

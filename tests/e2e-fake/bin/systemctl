@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Fake systemctl for tests: records the call in $ST/log; `--user` units are
+# remembered per fake HOME (enabled / active), so show and is-active answer.
+ST=${ST:?}; echo "systemctl $*" >> "$ST/log"
+D="$HOME/.fake-systemd"; mkdir -p "$D"
+args=(); for a in "$@"; do [[ $a == --user ]] || args+=("$a"); done
+set -- "${args[@]}"
+U="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+case $1 in
+  is-system-running) echo running;;
+  enable|disable)
+    op=$1; shift; now=0
+    for u in "$@"; do
+      [[ $u == --now ]] && { now=1; continue; }
+      if [[ $op == enable ]]; then touch "$D/$u.enabled"; (( now )) && touch "$D/$u.active"
+      else rm -f "$D/$u.enabled"; (( now )) && rm -f "$D/$u.active"; fi
+    done;;
+  start|restart)
+    [[ -f $U/$2 ]] || { echo "Failed to $1 $2: Unit $2 not found." >&2; exit 5; }
+    touch "$D/$2.active";;
+  stop) rm -f "$D/$2.active";;
+  is-active) [[ -f $D/$2.active ]] && { echo active; exit 0; }; echo inactive; exit 3;;
+  show)
+    [[ -f $U/$2 ]] && echo LoadState=loaded || echo LoadState=not-found
+    if [[ -f $D/$2.active ]]; then printf 'ActiveState=active\nSubState=running\nMainPID=4243\n'
+    else printf 'ActiveState=inactive\nSubState=dead\nMainPID=0\n'; fi
+    [[ -f $D/$2.enabled ]] && echo UnitFileState=enabled || echo UnitFileState=disabled
+    echo Result=success;;
+esac
+exit 0

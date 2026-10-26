@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Fake osascript for tests: records the call in $ST/log and succeeds.
+# A dialog (display dialog) answers with the button named in $ST/dialog
+# (none: no answer, as if it was cancelled); its text goes to $ST/dialog.log.
+ST=${ST:?}; echo "osascript $*" >> "$ST/log"
+case "$*" in *"display dialog"*)
+  printf '%s\n---\n' "$*" >> "$ST/dialog.log"
+  [ -f "$ST/dialog" ] && cat "$ST/dialog" || exit 1 ;;
+esac

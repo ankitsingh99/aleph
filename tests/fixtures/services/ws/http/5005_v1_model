@@ -1,0 +1,2 @@
+200
+{"id":"Llama-3.1-8B-Instruct-exl2-6.0bpw","object":"model","created":1736700000,"owned_by":"tabbyAPI","logging":{"log_prompt":false,"log_generation_params":false,"log_requests":false},"parameters":{"max_seq_len":16384,"rope_scale":1.0,"rope_alpha":1.0,"cache_size":16384,"cache_mode":"Q4","chunk_size":2048,"prompt_template":"llama3"}}

@@ -1,0 +1,17 @@
+# Append to your LOCAL ~/.config/herdr/config.toml, then herdr menu → "reload config".
+# Colours every agent's row (Claude Code, Codex, …) by the glyph the wrapper assigns (● ◆ ▲ ■ ★ ✚ ♦ ▼).
+# `claude theme herdr --apply` writes a fuller version, with machine colours.
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", { token = "$mark", rules = [
+    { equals = "●", fg = "#f38ba8" },
+    { equals = "◆", fg = "#fab387" },
+    { equals = "▲", fg = "#f9e2af" },
+    { equals = "■", fg = "#a6e3a1" },
+    { equals = "★", fg = "#94e2d5" },
+    { equals = "✚", fg = "#89b4fa" },
+    { equals = "♦", fg = "#cba6f7" },
+    { equals = "▼", fg = "#f5c2e7" }
+  ] }, { token = "tab", bold = true }, "state_text"],
+  ["machine", "workspace"]
+]

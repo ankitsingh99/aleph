@@ -1,0 +1,19 @@
+{
+  "data": [
+    {"id": "qwen/qwen3-coder", "canonical_slug": "qwen/qwen3-coder-480b-a35b-07-25", "name": "Qwen: Qwen3 Coder 480B A35B", "created": 1753230546, "context_length": 262144,
+     "architecture": {"modality": "text->text", "tokenizer": "Qwen3"},
+     "pricing": {"prompt": "0.00000022", "completion": "0.00000095", "request": "0", "image": "0"},
+     "top_provider": {"context_length": 262144, "max_completion_tokens": null, "is_moderated": false}},
+    {"id": "anthropic/claude-sonnet-4.5", "name": "Anthropic: Claude Sonnet 4.5", "created": 1759161676, "context_length": 1000000,
+     "pricing": {"prompt": "0.000003", "completion": "0.000015", "input_cache_read": "0.0000003"}},
+    {"id": "qwen/qwen3-coder:free", "name": "Qwen: Qwen3 Coder 480B A35B (free)", "context_length": 262000,
+     "pricing": {"prompt": "0", "completion": "0"}},
+    {"id": "openrouter/auto", "name": "Auto Router", "context_length": 2000000,
+     "pricing": {"prompt": "-1", "completion": "-1"}},
+    {"id": "z-ai/glm-4.6", "name": "Z.AI: GLM 4.6", "top_provider": {"context_length": 202752},
+     "pricing": {"prompt": 0.0000006, "completion": 0.0000022}},
+    {"name": "no id: skipped"},
+    {"id": "", "name": "empty id: skipped"}
+  ],
+  "total_count": 7
+}

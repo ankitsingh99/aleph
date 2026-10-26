@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fake editor (env.sh's ALEPH_EDITOR_CMD): records the call in $ST/log.
+echo "EDITOR $*" >> "${ST:?}/log"

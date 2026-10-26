@@ -1,0 +1,10 @@
+#!/bin/sh
+# Fake uv for the fake remotes: `tool install <pkg>` writes ~/.local/bin/<pkg
+# without -cli> (printing a version); never the real uv.
+echo "uv $*" >> "${ST:?}/log"
+if [ "$1 $2" = "tool install" ]; then
+  exe=${3%-cli}; mkdir -p "$HOME/.local/bin"
+  printf '#!/bin/sh\necho "%s, version 0.40.0"\n' "$exe" > "$HOME/.local/bin/$exe"; chmod +x "$HOME/.local/bin/$exe"
+  echo "Installed 1 executable: $exe"; exit 0
+fi
+echo "fake uv: unsupported: $*" >&2; exit 1

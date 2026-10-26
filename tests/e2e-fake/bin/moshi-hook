@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Fake moshi-hook (Moshi's host CLI): records every call in $ST/log and answers
+# like a paired host with Claude hooked natively. `ask` answers with the
+# first --option (or $ST/moshi_answer when it exists: an option, "deny" or
+# "timeout").
+ST=${ST:?}
+printf 'moshi-hook %s\n' "$*" >> "$ST/log"
+case $1 in
+  status)
+    # on a fake remote machine (FAKE_HOST, from bin/ssh): $ST/moshi_remote_<host>, else nothing hooked
+    if [[ -n ${FAKE_HOST:-} ]]; then
+      cat "$ST/moshi_remote_$FAKE_HOST" 2>/dev/null || echo '{"displayName":"'"$FAKE_HOST"'","paired":false,"hooks":[]}'
+    else
+      echo '{"displayName":"fake-mac","paired":true,"hooks":[{"target":"claude","status":"current"},{"target":"codex","status":"not_found"}]}'
+    fi ;;
+  probe) echo '{"installed":true,"running":true,"gateway":true,"version":"0.4.35","e2ee":{"policy":"off"}}' ;;
+  notify) exit 0 ;;
+  ask)
+    first="" ; shift
+    while (( $# )); do
+      case $1 in
+        --option) [[ -z $first ]] && first=$2; shift 2 ;;
+        --label|--source|--timeout|--options) shift 2 ;;
+        --) shift; break ;;
+        *) shift ;;
+      esac
+    done
+    ans=$(cat "$ST/moshi_answer" 2>/dev/null || echo "$first")
+    case $ans in
+      deny) exit 1 ;;
+      timeout) exit 3 ;;
+      "") exit 0 ;;
+      *) echo "$ans" ;;
+    esac ;;
+  job)
+    case $2 in start) echo "job_42" ;; *) exit 0 ;; esac ;;
+  usage) echo '[{"accountLabel":"Pro","agent":"claude","windows":[{"label":"5h","usedPercentage":42,"resetsAt":"2026-10-22T09:00:00Z"}]}]' ;;
+  cwd-list) echo '[{"cwd":"/srv/px","sources":["claude"],"lastUsed":1}]' ;;
+  *) exit 0 ;;
+esac

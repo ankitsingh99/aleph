@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# Fake herdr for tests (needs jq). State lives in $ST:
+#   machines.json, agents_<host>.json, tabs_<host>.json, up_<host>, log,
+#   panetab_<host> (panes the fake socket laid out or moved: fakesock.sh)
+# Local CLI calls use `--machine <label>`; calls made "on the remote" (through
+# the fake ssh) get the host from $FAKE_HOST.
+ST=${ST:?ST must point at the fake state dir}; echo "herdr $*" >> "$ST/log"
+err() { printf '{"error":{"code":"%s","message":"%s"}}\n' "$1" "$2" >&2; exit 1; }
+ok() { echo '{"result":{"type":"ok"}}'; }
+here=${FAKE_HOST:-local}
+[[ $1 == --version ]] && { echo "herdr $(cat "$ST/herdrver_$here" 2>/dev/null || echo 0.9.5)"; exit 0; }
+# integrations: $ST/integ_<host> holds "name state" lines (state: current | outdated | missing)
+if [[ $1 == integration ]]; then
+  # (a bare machine, $ST/bare_<host>, starts with none of them)
+  F=$ST/integ_$here; c=current; [[ -f $ST/bare_$here ]] && c=missing
+  [[ -f $F ]] || printf 'claude %s\ncodex missing\nopencode missing\ncursor missing\nantigravity-cli missing\n' "$c" > "$F"
+  case $2 in
+    status) while read -r n st; do
+        case $st in current) d="current (v11)";; outdated) d="outdated (v7 < v11)";; *) d="not installed";; esac
+        echo "$n: $d (/home/tester/.$n/herdr-agent-state.sh)"; done < "$F";;
+    install) grep -q "^$3 " "$F" || { echo "error: unknown integration $3" >&2; exit 1; }
+      sed "s/^$3 .*/$3 current/" "$F" > "$F.tmp" && mv "$F.tmp" "$F"; echo "installed $3 integration";;
+  esac; exit 0
+fi
+if [[ $1 == update ]]; then echo 0.9.5 > "$ST/herdrver_$here"; echo "herdr updated to 0.9.5"; exit 0; fi
+# plugins (aleph setup's companion): link a folder, list what's linked ($ST/plugins)
+if [[ $1 == plugin ]]; then
+  case $2 in
+    link) [[ -f $3/herdr-plugin.toml ]] || { echo "error: no herdr-plugin.toml in $3" >&2; exit 1; }; echo "$3" >> "$ST/plugins"; echo "linked $3";;
+    list) cat "$ST/plugins" 2>/dev/null;;
+  esac; exit 0
+fi
+# this computer's own herdr (the `local` machine): start the server, attach
+if [[ $1 == server && -z $2 ]]; then touch "$ST/up_${FAKE_HOST:-local}"; exit 0; fi
+if [[ $# -eq 0 ]]; then echo "ATTACH local" >> "$ST/log"; echo "[attached to local]"; exit 0; fi
+if [[ $1 == status && $2 == server ]]; then
+  [[ -f $ST/up_local ]] && echo "status: running" || echo "status: not running"
+  # this machine's fake socket (tests/e2e-fake/fakesock.sh), while it listens
+  [[ -n ${ALEPH_FAKE_SOCK:-} && -S $ALEPH_FAKE_SOCK/$here.sock ]] && echo "socket: $ALEPH_FAKE_SOCK/$here.sock"
+  exit 0
+fi
+if [[ $1 == --remote ]]; then echo "ATTACH $2" >> "$ST/log"; echo "[attached to $2]"; exit 0; fi
+if [[ $1 == machine ]]; then
+  case $2 in
+    list) if [[ $3 == --json ]]; then cat "$ST/machines.json"; else jq -r '.result.machines[] | "\(.label)  \(.ssh_target)"' "$ST/machines.json"; fi;;
+    # (installs herdr there first, as the real one does: a bare machine has it from now on)
+    add) jq --arg h "$3" '.result.machines += [{"id":"p_\($h)","label":$h,"ssh_target":$h,"enabled":true}]' "$ST/machines.json" > "$ST/m.tmp" && mv "$ST/m.tmp" "$ST/machines.json"; touch "$ST/up_$3"
+      [[ -f $ST/bare_$3 && ! -f $ST/herdr_on_$3 ]] && { touch "$ST/herdr_on_$3"; echo "installed herdr 0.9.5 on $3 (~/.local/bin/herdr)"; }
+      echo "saved $3";;
+  esac; exit 0
+fi
+if [[ $1 == --machine ]]; then
+  m=$2; shift 2
+  jq -e --arg m "$m" '[.result.machines[] | select(.label==$m or .id==$m)] | length > 0' "$ST/machines.json" >/dev/null || err unknown_machine "no saved machine '$m'"
+  host=$(jq -r --arg m "$m" '.result.machines[] | select(.label==$m or .id==$m) | .ssh_target' "$ST/machines.json" | head -1)
+else
+  host=${FAKE_HOST:-local}
+fi
+[[ -f $ST/up_$host ]] || err unavailable "no herdr server running on $host"
+A=$ST/agents_$host.json; T=$ST/tabs_$host.json
+[[ -f $A ]] || echo '{"result":{"agents":[]}}' > "$A"
+[[ -f $T ]] || echo '{"result":{"tabs":[]}}' > "$T"
+upd() { jq "$@" "$A" > "$A.tmp" && mv "$A.tmp" "$A"; }
+updt() { jq "$@" "$T" > "$T.tmp" && mv "$T.tmp" "$T"; }
+# like herdr: `agent …` on a pane with no agent in it is refused
+noagent() { jq -e --arg p "$1" 'any(.result.agents[]; .pane_id==$p or .name==$p)' "$A" >/dev/null || err agent_not_found "agent target $1 not found"; }
+opt() { local k=$1; shift; while (( $# )); do [[ $1 == "$k" ]] && { echo "$2"; return; }; shift; done; }
+n=$(( $(cat "$ST/seq" 2>/dev/null || echo 10) + 1 )); echo $n > "$ST/seq"
+case "$1 $2" in
+  "workspace list") echo '{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":[{"workspace_id":"w1","label":"train","number":1,"tab_count":3,"pane_count":4,"focused":true,"agent_status":"working","active_tab_id":"w1:t1"},{"workspace_id":"w2","label":"eval","number":2,"tab_count":1,"pane_count":1,"focused":false,"agent_status":"idle","active_tab_id":"w2:t1"}]}}';;
+  "worktree list") echo '{"id":"cli:worktree:list","result":{"type":"worktree_list","source":{"repo_name":"hunt","repo_root":"/srv/hunt","source_workspace_id":"w1"},"worktrees":[{"branch":"main","path":"/srv/hunt","label":"hunt","open_workspace_id":"w1","is_linked_worktree":false,"is_bare":false,"is_detached":false,"is_prunable":false},{"branch":"claude/ignite","path":"/srv/hunt-wt/ignite","label":"hunt:ignite","open_workspace_id":null,"is_linked_worktree":true,"is_bare":false,"is_detached":false,"is_prunable":false}]}}';;
+  "workspace create"|"tab create")
+    lbl=$(opt --label "$@"); [[ -n $FAILTAB && $1 == tab ]] && err boom "tab create exploded"
+    updt --arg l "$lbl" --arg t "w1:t$n" '.result.tabs += [{"tab_id":$t,"label":$l}]'
+    echo "{\"result\":{\"type\":\"tab_created\",\"tab\":{\"tab_id\":\"w1:t$n\"},\"root_pane\":{\"pane_id\":\"w1:p$n\"}}}";;
+  "worktree remove") echo "WORKTREE-REMOVE $(opt --workspace "$@")" >> "$ST/log"; ok;;
+  "worktree create") echo "{\"result\":{\"type\":\"worktree_created\",\"root_pane\":{\"pane_id\":\"w1:p$n\"},\"worktree\":{\"path\":\"$(opt --cwd "$@")/../wt-$n\"}}}";;
+  "agent list") cat "$A";;
+  # panes with no agent in them (plain shells): $ST/panes_<host>.json, [{pane_id, tab_id}]
+  "api snapshot") P=$ST/panes_$host.json; [[ -f $P ]] || { P=$ST/panes_none.json; echo '[{"pane_id":"w1:p99","agent_status":"unknown"}]' > "$P"; }
+    jq -s '{result:{type:"session_snapshot",snapshot:{version:"0.9.5",protocol:22,agents:.[0].result.agents,tabs:.[1].result.tabs,panes:.[2]}}}' "$A" "$T" "$P";;
+  "tab list") cat "$T";;
+  "pane split") echo "{\"result\":{\"type\":\"pane_info\",\"pane\":{\"pane_id\":\"w1:p$n\"}}}";;
+  "agent start")
+    name=$3; pane=$(opt --pane "$@"); kind=$(opt --kind "$@")
+    # its tab: where the fake socket put that pane (a layout, a move), else wN:pK's wN:tK
+    tab=$(awk -v p="$pane" '$1==p{t=$2} END{print t}' "$ST/panetab_$host" 2>/dev/null)
+    upd --arg p "$pane" --arg n "$name" --arg k "$kind" --arg t "$tab" '.result.agents += [{"pane_id":$p,"tab_id":(if $t != "" then $t else ("w1:t" + ($p|split(":p")[1])) end),"agent":$k,"agent_status":"idle","name":$n,"cwd":"/home/tester","tokens":{}}]'
+    echo '{"result":{"type":"agent_started"}}';;
+  "agent rename") upd --arg p "$3" --arg n "$4" '(.result.agents[] | select(.pane_id==$p or .name==$p)).name = $n'; ok;;
+  "tab rename") updt --arg t "$3" --arg l "$4" '(.result.tabs[] | select(.tab_id==$t)).label = $l'; ok;;
+  "pane close") upd --arg p "$3" '.result.agents |= map(select(.pane_id != $p))'; ok;;
+  "pane report-metadata") ok;;
+  "agent send-keys"|"agent focus") noagent "$3"; ok;;
+  "pane get") tab=$(jq -r --arg p "$3" '[.[] | select(.pane_id==$p) | .tab_id][0] // empty' "$ST/panes_$host.json" 2>/dev/null)
+    [[ -n $tab ]] || tab=$(jq -r --arg p "$3" '[.result.agents[] | select(.pane_id==$p) | .tab_id][0] // empty' "$A")
+    [[ -n $tab ]] || err pane_not_found "pane $3 not found"
+    echo "{\"result\":{\"type\":\"pane_info\",\"pane\":{\"pane_id\":\"$3\",\"tab_id\":\"$tab\"}}}";;
+  "tab focus") echo "TAB-FOCUS $3" >> "$ST/log"; ok;;
+  "agent prompt")
+    noagent "$3"
+    st=$(jq -r --arg p "$3" '.result.agents[] | select(.pane_id==$p or .name==$p) | .agent_status' "$A")
+    [[ $st == blocked ]] && err agent_blocked "agent is waiting for input"
+    echo "PROMPT $3 ${*:4}" >> "$ST/log"; ok;;
+  "pane run") echo "RUN $3 ${*:4}" >> "$ST/log"; ok;;
+  "pane send-keys"|"pane send-text"|"server reload-config") ok;;
+  "agent wait") echo "WAIT $3" >> "$ST/log"; st=$(jq -r --arg p "$3" '.result.agents[] | select(.pane_id==$p or .name==$p) | .agent_status' "$A"); echo "{\"result\":{\"type\":\"agent_wait\",\"agent\":{\"pane_id\":\"$3\",\"agent_status\":\"${st:-idle}\"}}}";;
+  "pane move") echo "{\"result\":{\"move_result\":{\"pane\":{\"pane_id\":\"$3\"},\"tab\":{\"tab_id\":\"w1:t$n\"}}}}";;
+  "pane read"|"agent read")
+    if [[ " $* " == *" detection "* ]]; then cat <<'TXT'
+ Do you want to run this command?
+   cargo build --release --target x86_64-unknown-linux-musl
+
+ ❯ 1. Yes
+   2. Yes, and don't ask again for cargo commands
+   3. No, and tell Claude what to do differently (esc)
+TXT
+    elif [ -f "$ST/screen_$3" ]; then
+      # a test-provided screen for this pane (e.g. a usage-limit message)
+      cat "$ST/screen_$3"
+    else
+      # like herdr: ANSI only with --ansi
+      strip() { if [[ " $* " == *" --ansi "* ]]; then cat; else sed $'s/\033\\[[0-9;]*m//g'; fi; }
+      printf '\033[38;2;217;119;87m⏺\033[0m I'"'"'ll profile the layout engine build first.\n\n\033[1m⏺ Bash\033[0m(cargo bench --bench parse_layout)\n  ⎿  Finished `bench` in 41.2 s\n     parse_layout: 812.4 µs/iter\n\n⏺ FP16 engine is 2.3× faster than the PyTorch baseline.\n\n\033[38;2;217;119;87m✻ Pondering…\033[0m (12s · esc to interrupt)\n' | strip "$@"
+    fi;;
+  "terminal session")
+    # observe <pane> | control <pane> (control sizes the pane: frames come at --cols × --rows)
+    W=220 H=64
+    if [ "$3" = control ]; then W=$(opt --cols "$@"); H=$(opt --rows "$@"); fi
+    echo "SESSION $3 $4 ${W}x${H}" >> "$ST/log"
+    # what a controller sends (keys, pastes, the wheel, clicks): one line each in the log
+    # (a background job's stdin is /dev/null: the controller's pipe goes by fd 3)
+    if [ "$3" = control ]; then exec 3<&0; ( while IFS= read -r l <&3; do echo "CONTROL $4 $l" >> "$ST/log"; done ) & fi
+    frame() { printf '{"type":"terminal.frame","seq":%s,"encoding":"ansi","width":%s,"height":%s,"full":true,"bytes":"%s"}\n' "$1" "$W" "$H" "$(printf '%b' "$2" | base64 | tr -d '\n')"; }
+    # the agent's input box sits on the last row, as wide as the terminal
+    bar=$(printf '%*s' "$((W - 4))" '' | tr ' ' '-')
+    foot="\033[${H};1H> ${bar} <"
+    frame 1 '\033[2J\033[H\033[38;2;217;119;87m✻\033[0m Welcome back — pane '"$4"' on '"$host"'\r\n\r\n> fix the flaky tests\r\n\r\n⏺ Running pytest -x…'"$foot"
+    sleep 1
+    if [ "$4" = w1:p2 ]; then
+      # the blocked one asks before running a command (a numbered menu)
+      frame 2 '\033[2J\033[H\033[38;2;217;119;87m✻\033[0m Welcome back — pane '"$4"' on '"$host"'\r\n\r\n> fix the flaky tests\r\n\r\n⏺ Bash(pytest -x tests/)\r\n\r\n Do you want to proceed?\r\n ❯ 1. Yes\r\n   2. Yes, and don'"'"'t ask again for pytest commands\r\n   3. No, and tell Claude what to do differently (esc)'"$foot"
+    else
+      frame 2 '\033[2J\033[H\033[38;2;217;119;87m✻\033[0m Welcome back — pane '"$4"' on '"$host"'\r\n\r\n> fix the flaky tests\r\n\r\n⏺ 41 passed, 1 failed\r\n\r\n\033[38;2;217;119;87m✻ Thinking…\033[0m'"$foot"
+    fi
+    sleep 3600;;
+  *) echo '{"result":{}}';;
+esac

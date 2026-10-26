@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Fake loginctl: records the call in $ST/log. Linger is off unless
+# $ST/linger exists. Aleph must never change it, so enable-linger fails loudly.
+ST=${ST:?}; echo "loginctl $*" >> "$ST/log"
+case $1 in
+  show-user) [[ -f $ST/linger ]] && echo Linger=yes || echo Linger=no;;
+  enable-linger|disable-linger) echo "fake loginctl: Aleph must never run $1" >&2; exit 1;;
+esac
+exit 0

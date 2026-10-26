@@ -1,0 +1,9 @@
+{"sessionId":"b2c3d4e5-0000-4000-8000-000000000005","projectHash":"7d1e4c0a9b2f3e6d8c5a4b3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d","startTime":"2026-10-22T08:30:00.000Z","lastUpdated":"2026-10-22T08:30:00.000Z","kind":"main"}
+{"id":"n-0001","timestamp":"2026-10-22T08:30:05.000Z","type":"user","content":[{"text":"SECRET question, with \"tokens\" in it"}]}
+{"$set":{"lastUpdated":"2026-10-22T08:30:05.000Z"}}
+{"id":"n-0002","timestamp":"2026-10-22T08:30:20.000Z","type":"gemini","content":[{"text":"SECRET answer"}],"thoughts":[{"subject":"SECRET","description":"SECRET thinking","timestamp":"2026-10-22T08:30:10.000Z"}],"model":"gemini-2.5-pro"}
+{"$set":{"lastUpdated":"2026-10-22T08:30:20.000Z"}}
+{"id":"n-0002","timestamp":"2026-10-22T08:30:20.000Z","type":"gemini","content":[{"text":"SECRET answer"}],"thoughts":[{"subject":"SECRET","description":"SECRET thinking","timestamp":"2026-10-22T08:30:10.000Z"}],"tokens":{"input":3000,"output":600,"cached":1000,"thoughts":120,"tool":0,"total":3720},"model":"gemini-2.5-pro"}
+{"$set":{"summary":"SECRET summary of the chat"}}
+{"$patch":{"updates":[{"id":"n-0001","content":[{"text":"SECRET edited"}]}]}}
+{"id":"n-0003","timestamp":"2026-10-22T08:30:40.000Z","type":"gemini","content":[{"text":"SECRET"}],"toolCalls":[{"id":"call-g1","name":"run_shell_command","args":{"command":"SECRET"},"status":"success","timestamp":"2026-10-22T08:30:35.000Z","result":[{"text":"SECRET"}]},{"id":"call-g2","name":"google_web_search","args":{"query":"SECRET"},"status":"error","timestamp":"2026-10-22T08:30:38.000Z"}],"model":"gemini-2.5-pro"}
