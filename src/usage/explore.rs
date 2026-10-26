@@ -55,6 +55,16 @@ fn label_of(by: By, key: &str, names: &HashMap<String, String>) -> String {
             .unwrap_or_else(|| "account unknown".into()),
         By::Agent => crate::agents::label(key),
         By::Project => super::projects::name_of(key),
+        // `claude:3f2a9c1e-…` → `Claude Code 3f2a9c1e`
+        By::Session => match key.split_once(':') {
+            Some((a, id)) => format!(
+                "{} {}",
+                crate::agents::label(a),
+                id.chars().take(8).collect::<String>()
+            ),
+            None if key.is_empty() => "(none)".into(),
+            None => key.to_string(),
+        },
         _ if key.is_empty() => "(none)".into(),
         _ => key.to_string(),
     }
@@ -73,6 +83,9 @@ fn key_of(by: By, r: &SRow) -> String {
             }
         }
         By::Model => r.model.clone(),
+        By::Effort => r.effort.clone(),
+        By::Session if !r.session.is_empty() => format!("{}:{}", r.agent, r.session),
+        By::Session => String::new(),
         _ => r.project.clone(),
     }
 }
@@ -613,6 +626,41 @@ mod tests {
         assert_eq!(
             m.model_mix.last().unwrap().1.iter().sum::<f64>().round(),
             1.0
+        );
+    }
+
+    #[test]
+    fn the_charts_split_by_every_breakdown() {
+        let today = crate::ui::local_day(crate::cache::now());
+        let mut a = row(today, 9, "claude", "aaaa", 2.0);
+        a.effort = "high".into();
+        let mut b = row(today, 10, "codex", "bbbb", 1.0);
+        b.model = "gpt-6-astra".into();
+        let rs = vec![a, b];
+        let split = |by: By| {
+            more(
+                &Config::in_memory(&[]),
+                Range::days(3),
+                &Filter::default(),
+                by,
+                by,
+                By::Account,
+                &rs,
+                &HashMap::new(),
+            )
+            .breakup
+            .iter()
+            .map(|x| x.1.clone())
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(split(By::Model), ["claude-opus-5-5", "gpt-6-astra"]);
+        assert_eq!(split(By::Effort), ["high", "(none)"]);
+        assert_eq!(
+            split(By::Session),
+            [
+                format!("Claude Code claude-{}", &today.to_string()[..1]),
+                format!("Codex codex-{}", &today.to_string()[..2])
+            ]
         );
     }
 }

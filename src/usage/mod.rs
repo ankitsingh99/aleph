@@ -27,6 +27,7 @@ pub mod live;
 pub mod now;
 pub mod parse;
 pub mod projects;
+pub mod recent;
 pub mod steps;
 pub mod store;
 
@@ -538,6 +539,8 @@ pub struct Row {
     pub cost_reported: f64,
     pub cost_estimated: f64,
     pub unpriced: u64,
+    /// requests at no charge (free models): in the tokens, a known $0
+    pub free: u64,
     pub web: u64,
     pub first: u64,
     pub last: u64,
@@ -567,6 +570,10 @@ impl Row {
     pub fn estimated(&self) -> bool {
         self.cost_estimated > 0.0
     }
+    /// Every request in it was free (a free model): its cost says "free", not $0.
+    pub fn all_free(&self) -> bool {
+        self.free > 0 && self.cost() <= 0.0 && self.unpriced == 0
+    }
     /// Active time: the larger of the request-gap sum and logged turn time.
     pub fn active_secs(&self) -> u64 {
         self.active_ms.max(self.turn_ms) / 1000
@@ -593,6 +600,7 @@ impl Row {
         self.cost_reported += r.cost_reported;
         self.cost_estimated += r.cost_estimated;
         self.unpriced += r.unpriced;
+        self.free += r.free;
         self.web += r.web;
         if r.first > 0 && (self.first == 0 || r.first < self.first) {
             self.first = r.first;
@@ -1114,7 +1122,7 @@ pub fn sync_with(
         if g < store::GEN {
             let had = offsets.hosts.get(h).is_some_and(|s| !s.files.is_empty());
             if let Some(st) = offsets.hosts.get_mut(h) {
-                st.files.clear();
+                store::regen(g, &mut st.files, crate::cache::now());
             }
             gens.insert(h.clone(), (store::GEN, had));
         }
@@ -1466,6 +1474,8 @@ impl Background {
                 &|h| turn.contains(h),
                 |_| {},
             );
+            // prices for models the agents don't price (OpenRouter's list: with a key only)
+            crate::openrouter::refresh_catalog(&cfg);
             let v = now::refresh(&cfg, &down);
             let mut l = last.lock().unwrap();
             if !l.as_ref().is_some_and(|o| now::same_numbers(o, &v)) {
@@ -1642,6 +1652,235 @@ mod tests {
     }
 
     #[test]
+    fn antigravity_conversations_with_each_requests_model() {
+        if !have("sqlite3") {
+            return;
+        }
+        let fx = extract::tests::fixtures();
+        let h = std::env::temp_dir().join(format!("aleph-usage-agy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&h);
+        let a = h.join(".gemini/antigravity-cli");
+        copy_dir(&fx.join("agy/brain"), &a.join("brain"));
+        let id = "7e1d2c3b-aaaa-4bbb-8ccc-0d1e2f3a4b5c";
+        std::fs::create_dir_all(a.join("conversations")).unwrap();
+        let sql = std::fs::read(fx.join("agy/conversation.sql")).unwrap();
+        let o = proc::run(
+            std::process::Command::new("sqlite3").arg(a.join(format!("conversations/{id}.db"))),
+            Duration::from_secs(10),
+            Some(&sql),
+        )
+        .unwrap();
+        assert!(o.ok(), "{}", o.stderr);
+        let opts = extract::Opts::default();
+        let out = run_script(&h, &opts, &[]);
+        let recs: Vec<&parse::Record> = out
+            .files
+            .iter()
+            .flat_map(|f| f.records.iter())
+            .filter(|r| r.agent == "agy")
+            .collect();
+        let reqs: Vec<_> = recs.iter().filter(|r| !r.is_turn()).collect();
+        // each request its own model (it changed between them), the folder from the
+        // conversation, thinking inside the output
+        let m: Vec<(&str, u64, u64, u64, u64)> = reqs
+            .iter()
+            .map(|r| {
+                (
+                    r.model.as_str(),
+                    r.input,
+                    r.output,
+                    r.reasoning,
+                    r.cache_read,
+                )
+            })
+            .collect();
+        assert_eq!(
+            m,
+            [
+                ("gemini-3.8-flash-n", 1000, 150, 40, 0),
+                ("gemini-3-pro", 300, 90, 30, 1200)
+            ]
+        );
+        assert!(reqs
+            .iter()
+            .all(|r| r.session == id && r.project == "/home/u/app"));
+        let turns: Vec<u64> = recs
+            .iter()
+            .filter(|r| r.is_turn())
+            .map(|r| r.turn_ms)
+            .collect();
+        assert_eq!(turns, [5000], "the prompt ran until the answer");
+        use steps::Kind;
+        let st: Vec<&steps::Step> = out.files.iter().flat_map(|f| f.steps.iter()).collect();
+        assert!(st.iter().any(|s| s.kind == Kind::Prompt && s.name == "u"));
+        assert!(st
+            .iter()
+            .any(|s| s.kind == Kind::ToolStart && s.name == "read_file"));
+        assert!(st.iter().any(|s| s.kind == Kind::ToolEnd));
+        // read again: nothing new, and the state carried says where it was
+        let mut st2 = store::HostState::default();
+        apply(&mut st2, &out, &opts.agents);
+        let again = run_script(&h, &opts, &known_of(&st2));
+        let n: usize = again
+            .files
+            .iter()
+            .filter(|f| f.agent == "agy")
+            .map(|f| f.records.len())
+            .sum();
+        assert_eq!(n, 0);
+        let _ = std::fs::remove_dir_all(&h);
+    }
+
+    #[test]
+    fn gemini_on_an_api_key_is_the_keys_account_not_the_google_one() {
+        let fx = extract::tests::fixtures();
+        let h = std::env::temp_dir().join(format!("aleph-usage-gem-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&h);
+        copy_dir(&fx.join("gemini/tmp"), &h.join(".gemini/tmp"));
+        std::fs::copy(
+            fx.join("canary/google_accounts.json"),
+            h.join(".gemini/google_accounts.json"),
+        )
+        .unwrap();
+        let account = |settings: &str| {
+            std::fs::write(h.join(".gemini/settings.json"), settings).unwrap();
+            let mut out = run_script(&h, &extract::Opts::default(), &[]);
+            let mut book = accounts::Book::default();
+            let at = out.now;
+            accounts::stamp(&mut book, "local", &mut out, at);
+            let a: Vec<accounts::Account> = book
+                .accounts
+                .values()
+                .filter(|a| a.agent == "gemini")
+                .cloned()
+                .collect();
+            assert_eq!(a.len(), 1, "{a:#?}");
+            a[0].clone()
+        };
+        let key = account(r#"{"security":{"auth":{"selectedType":"gemini-api-key"}}}"#);
+        assert_eq!((key.kind.as_str(), key.email.as_str()), ("api", ""));
+        let google = account(r#"{"security":{"auth":{"selectedType":"oauth-personal"}}}"#);
+        assert_eq!(google.email, "u@gmail.example");
+        let vertex = account(r#"{"selectedAuthType":"vertex-ai"}"#);
+        assert_eq!(
+            (vertex.kind.as_str(), vertex.plan.as_str()),
+            ("api", "Vertex AI")
+        );
+        let _ = std::fs::remove_dir_all(&h);
+    }
+
+    #[test]
+    fn opencode_2_database_is_read_from_its_own_tables() {
+        if !have("sqlite3") {
+            return;
+        }
+        let fx = extract::tests::fixtures();
+        let h = std::env::temp_dir().join(format!("aleph-usage-oc2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&h);
+        let db = h.join(".local/share/opencode/opencode.db");
+        std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+        let sql = std::fs::read(fx.join("opencode/opencode2.sql")).unwrap();
+        let o = proc::run(
+            std::process::Command::new("sqlite3").arg(&db),
+            Duration::from_secs(10),
+            Some(&sql),
+        )
+        .unwrap();
+        assert!(o.ok(), "{}", o.stderr);
+        let out = run_script(&h, &extract::Opts::default(), &[]);
+        let _ = std::fs::remove_dir_all(&h);
+        let recs: Vec<&parse::Record> = out
+            .files
+            .iter()
+            .flat_map(|f| f.records.iter())
+            .filter(|r| r.agent == "opencode")
+            .collect();
+        // three requests (the copy in the old table isn't read again), then three
+        // more through OpenRouter and OpenCode's own models
+        let reqs: Vec<_> = recs.iter().filter(|r| !r.is_turn()).collect();
+        assert_eq!(reqs.len(), 6, "{recs:#?}");
+        let by_model = |m: &str| reqs.iter().find(|r| r.model == m).unwrap();
+        let or_paid = by_model("anthropic/claude-sonnet-4.5");
+        assert_eq!((or_paid.cost, or_paid.free()), (Some(0.0123), false));
+        assert!(by_model("qwen/qwen3-coder:free").free());
+        assert!(by_model("big-pickle").free(), "OpenCode's own model, $0");
+        assert!(
+            !by_model("gpt-5.1-codex").free(),
+            "a subscription's $0 is priced"
+        );
+        // priced: what OpenCode reported, free ones a known zero, the rest estimated
+        let owned: Vec<parse::Record> = reqs.iter().map(|r| (**r).clone()).collect();
+        let rows = store::build(owned, &prices::Table::default(), 0);
+        let total = |f: fn(&store::Row) -> f64| rows.iter().map(f).sum::<f64>();
+        assert!((total(|r| r.cost_reported) - 0.0323).abs() < 1e-9);
+        assert!(total(|r| r.cost_estimated) > 0.0);
+        assert_eq!(rows.iter().map(|r| r.unpriced).sum::<u64>(), 0);
+        // a free model's row: its tokens and requests counted, its cost "free"
+        let by_m = group(&rows, By::Model);
+        let free = by_m
+            .iter()
+            .find(|r| r.key == "qwen/qwen3-coder:free")
+            .unwrap();
+        assert_eq!((free.requests, free.tokens(), free.free), (1, 2200, 1));
+        assert!(free.all_free());
+        assert_eq!(cmd::money(free), "free");
+        let all = group(&rows, By::Agent);
+        assert_eq!(all[0].free, 2);
+        assert!(!all[0].all_free() && cmd::money(&all[0]).starts_with('$'));
+        let first = reqs.iter().find(|r| r.ts == 1_792_661_001).unwrap();
+        assert_eq!(
+            (
+                first.session.as_str(),
+                first.model.as_str(),
+                first.effort.as_str()
+            ),
+            ("ses_v2a", "gpt-5.1-codex", "high")
+        );
+        assert_eq!(first.project, "/home/u/app");
+        assert_eq!(
+            (first.input, first.output, first.reasoning, first.cache_read),
+            (900, 160, 40, 6000),
+            "output carries reasoning, as with OpenCode 1"
+        );
+        assert!(reqs.iter().any(|r| r.session == "ses_v2b"));
+        let turns: Vec<u64> = recs
+            .iter()
+            .filter(|r| r.is_turn())
+            .map(|r| r.turn_ms)
+            .collect();
+        assert_eq!(turns, [30_000, 100_000]);
+        // the timeline: prompts by whom, tools, the subagent's lane and the call that
+        // started it, the compaction, the interruption
+        use steps::Kind;
+        let all: Vec<&steps::Step> = out.files.iter().flat_map(|f| f.steps.iter()).collect();
+        let has = |kind: Kind, name: &str| {
+            all.iter()
+                .any(|s| s.agent == "opencode" && s.kind == kind && s.name == name)
+        };
+        assert!(has(Kind::Prompt, "u") && has(Kind::Prompt, "a") && has(Kind::Prompt, "s"));
+        assert!(has(Kind::ToolStart, "read") && has(Kind::ToolStart, "task"));
+        assert!(has(Kind::ToolStart, "grep") && has(Kind::ToolEnd, "err"));
+        assert!(has(Kind::Compact, "") || all.iter().any(|s| s.kind == Kind::Compact));
+        assert!(all
+            .iter()
+            .any(|s| s.kind == Kind::Error && s.name == "interrupted"));
+        let lane = all.iter().find(|s| s.kind == Kind::Lane).unwrap();
+        assert_eq!(
+            (
+                lane.session.as_str(),
+                lane.lane.as_str(),
+                lane.name.as_str()
+            ),
+            ("ses_v2a", "ses_v2b", "explore")
+        );
+        let task = all
+            .iter()
+            .find(|s| s.kind == Kind::ToolStart && s.name == "task")
+            .unwrap();
+        assert_eq!(lane.class, task.key, "the lane hangs off the task call");
+    }
+
+    #[test]
     fn script_reads_every_agent_then_only_what_is_new() {
         let home = fake_home();
         let o = extract::Opts::default();
@@ -1680,10 +1919,14 @@ mod tests {
         let omp = first.agents.iter().find(|x| x.agent == "omp").unwrap();
         assert!(omp.roots.is_empty(), "no OMP logs here");
         if !sqlite {
-            assert!(first
-                .skipped
-                .iter()
-                .any(|(a, _, w)| a == "opencode" && w == "needs sqlite3"));
+            assert!(
+                first
+                    .skipped
+                    .iter()
+                    .any(|(a, _, w)| a == "opencode" && w == "needs sqlite3"),
+                "{:?}",
+                first.skipped
+            );
         }
         // whose: each Claude config folder's own account (the second login found
         // beside the first), Gemini's sign-in; never a credential (SECRET above)

@@ -178,7 +178,8 @@ pub(crate) fn pump(d: &mut Dash) {
         d.usage.f.range(),
         BYS[d.usage.by % BYS.len()].0,
     );
-    let split = super::usage_tabs::SPLITS[d.usage.view.split % super::usage_tabs::SPLITS.len()].0;
+    // the breakup and the daily stacks split by what the rows are (`b`)
+    let split = by;
     let tree =
         super::usage_tabs::SPLITS[d.usage.view.pivot_split % super::usage_tabs::SPLITS.len()].0;
     std::thread::spawn(move || {
@@ -244,10 +245,7 @@ pub(crate) fn today_line(r: &Row) -> Vec<Span<'static>> {
     ];
     if r.cost() > 0.0 {
         v.push(Span::styled(" · ", ui::faint()));
-        v.push(Span::styled(
-            dash::money(r.cost(), r.estimated()),
-            ui::muted(),
-        ));
+        v.push(Span::styled(dash::row_money(r), ui::muted()));
     }
     if r.active_secs() > 0 {
         v.push(Span::styled(" · ", ui::faint()));
@@ -282,16 +280,8 @@ pub(crate) fn on_key(d: &mut Dash, k: KeyEvent) -> bool {
             d.usage.f.period = (d.usage.f.period + periods - 1) % periods;
             reload(d);
         }
-        KeyCode::Char('b') => {
-            d.usage.by = (d.usage.by + 1) % BYS.len();
-            d.usage.sel = 0;
-            reload(d);
-        }
-        KeyCode::Char('B') => {
-            d.usage.by = (d.usage.by + BYS.len() - 1) % BYS.len();
-            d.usage.sel = 0;
-            reload(d);
-        }
+        KeyCode::Char('b') => step_by(d, 1),
+        KeyCode::Char('B') => step_by(d, BYS.len() - 1),
 
         KeyCode::Char('[') | KeyCode::Char(']') if d.usage.mine => return false,
         KeyCode::Down | KeyCode::Char('j') => {
@@ -396,9 +386,22 @@ fn open_selected(d: &mut Dash) {
     }
 }
 
-/// What the breakdown's rows are (`b`).
+/// What the breakdown's rows are (`b`); the breakup and the daily stacks
+/// split by it too.
 pub(crate) fn by_of(d: &Dash) -> By {
     BYS[d.usage.by % BYS.len()].0
+}
+
+/// Its name, for the charts' titles.
+pub(crate) fn by_name(d: &Dash) -> &'static str {
+    BYS[d.usage.by % BYS.len()].1
+}
+
+/// The next (or, `n` = len − 1, the previous) "by", read again.
+pub(crate) fn step_by(d: &mut Dash, n: usize) {
+    d.usage.by = (d.usage.by + n) % BYS.len();
+    d.usage.sel = 0;
+    reload(d);
 }
 
 pub(crate) fn hints() -> Vec<(&'static str, &'static str)> {

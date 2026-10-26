@@ -31,6 +31,10 @@ pub struct Sums {
 }
 
 impl Sums {
+    /// What ran: its requests and tool calls.
+    pub fn steps(&self) -> u64 {
+        self.requests + self.tools
+    }
     fn add(&mut self, o: &Sums) {
         self.input += o.input;
         self.output += o.output;
@@ -521,6 +525,29 @@ pub fn rows(tree: &Tree, mode: Fold, toggled: &HashMap<String, bool>, running: b
     let open = |id: &str, default: bool| toggled.get(id).copied().unwrap_or(default);
     for lane in &tree.lanes {
         let lid = format!("L{}", lane.id);
+        // the whole conversation folded to one line (`1`): what it took, in all
+        if lane.id.is_empty() && toggled.get(&lid) == Some(&false) {
+            out.push(Row {
+                id: lid.clone(),
+                depth: 0,
+                kind: RowKind::Lane,
+                label: format!(
+                    "this session · {} prompt{} · {} steps",
+                    lane.prompts.len(),
+                    if lane.prompts.len() == 1 { "" } else { "s" },
+                    lane.sums.steps()
+                ),
+                start: lane.start,
+                end: lane.end,
+                sums: lane.sums.clone(),
+                foldable: true,
+                folded: true,
+                bad: lane.sums.errors > 0,
+                lane: String::new(),
+                key: String::new(),
+            });
+            continue;
+        }
         // a subagent's lane is drawn under the call that started it; one with no link, here
         if !lane.id.is_empty() {
             if tree.lanes.iter().any(|l| {
@@ -537,14 +564,26 @@ pub fn rows(tree: &Tree, mode: Fold, toggled: &HashMap<String, bool>, running: b
                 id: lid.clone(),
                 depth: 0,
                 kind: RowKind::Lane,
-                label: format!(
-                    "{} agent",
-                    if lane.kind.is_empty() {
-                        "a sub"
+                label: {
+                    let name = format!(
+                        "{} agent",
+                        if lane.kind.is_empty() {
+                            "a sub"
+                        } else {
+                            &lane.kind
+                        }
+                    );
+                    if o {
+                        name
                     } else {
-                        &lane.kind
+                        format!(
+                            "{name} · {} prompt{} · {} steps",
+                            lane.prompts.len(),
+                            if lane.prompts.len() == 1 { "" } else { "s" },
+                            lane.sums.steps()
+                        )
                     }
-                ),
+                },
                 start: lane.start,
                 end: lane.end,
                 sums: lane.sums.clone(),
@@ -599,15 +638,23 @@ fn lane_rows(
             id: pid.clone(),
             depth,
             kind: RowKind::Prompt,
-            label: format!(
-                "prompt {} · {}",
-                pi + if lane.prompts.first().is_some_and(|f| f.by.is_empty()) {
-                    0
+            label: {
+                let l = format!(
+                    "prompt {} · {}",
+                    pi + if lane.prompts.first().is_some_and(|f| f.by.is_empty()) {
+                        0
+                    } else {
+                        1
+                    },
+                    who(&p.by)
+                );
+                // folded: how many steps ran under it
+                if o || p.turns.is_empty() {
+                    l
                 } else {
-                    1
-                },
-                who(&p.by)
-            ),
+                    format!("{l} · {} steps", p.sums.steps())
+                }
+            },
             start: p.start,
             end: p.end,
             sums: p.sums.clone(),
@@ -925,14 +972,25 @@ fn tool_rows(
     }
 }
 
-/// `opus-4-5` from `claude-opus-4-5-20251101`.
+/// `opus-4-5` from `claude-opus-4-5-20251101`; a provider's prefix dropped
+/// (`anthropic/claude-sonnet-4.5` through OpenRouter is `sonnet-4.5`), a free
+/// variant said (`qwen3-coder free`).
 pub fn short_model(m: &str) -> String {
+    let (m, free) = match m.strip_suffix(":free") {
+        Some(b) => (b, true),
+        None => (m, false),
+    };
+    let m = m.rsplit_once('/').map_or(m, |x| x.1);
     let m = m.strip_prefix("claude-").unwrap_or(m);
     let m = match m.rsplit_once('-') {
         Some((a, d)) if d.len() == 8 && d.chars().all(|c| c.is_ascii_digit()) => a,
         _ => m,
     };
-    m.to_string()
+    if free {
+        format!("{m} free")
+    } else {
+        m.to_string()
+    }
 }
 
 // ------------------------------------------------------------------ loading
@@ -1200,8 +1258,9 @@ fn parts(r: &Row) -> Vec<(u8, String)> {
         if r.sums.tools > 0 {
             v.push((4, format!("{} tools", r.sums.tools)));
         }
+        // a failure outranks the token counts: it stays when room is short
         if r.sums.errors > 0 {
-            v.push((3, format!("{} failed", r.sums.errors)));
+            v.push((1, format!("{} failed", r.sums.errors)));
         }
     }
     let m = money(r.sums.cost);
@@ -1476,6 +1535,28 @@ mod tests {
                 .any(|l| l.starts_with("compacted · 150k → 30k")),
             "{labels:#?}"
         );
+        // folded by session: one line for the conversation, with what ran in it
+        let mut by_session = HashMap::new();
+        by_session.insert("L".to_string(), false);
+        let r = rows(&t, Fold::Open, &by_session, false);
+        assert_eq!(
+            r.len(),
+            1,
+            "{:#?}",
+            r.iter().map(|x| &x.label).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            r[0].label,
+            format!("this session · 2 prompts · {} steps", main.sums.steps())
+        );
+        assert!(r[0].folded && r[0].foldable);
+        // folded by prompt: each with the steps that ran under it
+        let r = rows(&t, Fold::Folded, &HashMap::new(), false);
+        let p1row = r.iter().find(|x| x.kind == RowKind::Prompt).unwrap();
+        assert_eq!(
+            p1row.label,
+            format!("prompt 1 · you · {} steps", p1.sums.steps())
+        );
         // smart: finished prompts closed, except one with an error in it (its subagent's? no: its own)
         let r = rows(&t, Fold::Smart, &HashMap::new(), true);
         let p1row = r.iter().find(|x| x.kind == RowKind::Prompt).unwrap();
@@ -1538,6 +1619,9 @@ mod tests {
         );
         assert_eq!(group(&[]), Vec::<Group>::new());
         assert_eq!(short_model("claude-opus-4-5-20251101"), "opus-4-5");
+        assert_eq!(short_model("anthropic/claude-sonnet-4.5"), "sonnet-4.5");
+        assert_eq!(short_model("qwen/qwen3-coder:free"), "qwen3-coder free");
+        assert_eq!(short_model("gemini-3.8-flash-n"), "gemini-3.8-flash-n");
     }
 
     #[test]

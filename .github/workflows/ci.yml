@@ -1,4 +1,4 @@
-# fmt · clippy -D warnings · unit tests (ubuntu + macos) · fake-machine smoke (ubuntu)
+# leak scan · fmt · clippy -D warnings · unit tests (ubuntu + macos) · fake-machine smoke (ubuntu)
 name: ci
 
 on:
@@ -19,6 +19,18 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  leaks:
+    # credentials and machine paths by their shapes, in the files and in every
+    # commit pushed (the personal terms list lives only on your own computer)
+    name: leak scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: tools/leak-scan.sh tree
+      - run: tools/leak-scan.sh history HEAD
+
   fmt:
     name: rustfmt
     runs-on: ubuntu-latest

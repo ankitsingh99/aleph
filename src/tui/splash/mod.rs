@@ -2690,12 +2690,22 @@ mod tests {
                 Ok(v) => v.split(',').filter_map(|m| m.trim().parse().ok()).collect(),
                 Err(_) => (0..24u64).map(|i| tot * i / 23).collect(),
             };
+            // SPLASH_THEME=convergence: in that theme's colours
+            if let Ok(t) = std::env::var("SPLASH_THEME") {
+                crate::ui::c::init(&t, None);
+            }
+            // SPLASH_ANSI=1: a terminal's colour text instead of a page
+            let as_ansi = std::env::var_os("SPLASH_ANSI").is_some();
             for ms in moments {
                 let area = Rect::new(0, 0, w, h);
                 let mut b = Buffer::empty(area);
                 super::frame(k, &mut b, area, ms, 42, &info(), "ℵ", opts, None);
-                let name = format!("{}-f{ms:04}.html", k.name());
-                std::fs::write(std::path::Path::new(&dir).join(name), html(&b)).unwrap();
+                let (name, body) = if as_ansi {
+                    (format!("{}-f{ms:05}.ansi", k.name()), ansi(&b))
+                } else {
+                    (format!("{}-f{ms:04}.html", k.name()), html(&b))
+                };
+                std::fs::write(std::path::Path::new(&dir).join(name), body).unwrap();
             }
             return;
         }
@@ -2729,6 +2739,59 @@ mod tests {
     }
 
     /// A frame as a page (for a browser's screenshot).
+    /// A buffer as a terminal would get it: SGR colours, one line a row.
+    fn ansi(b: &Buffer) -> String {
+        fn sgr(c: Color, fg: bool) -> String {
+            let base = if fg { 38 } else { 48 };
+            match c {
+                Color::Rgb(r, g, b) => format!("{base};2;{r};{g};{b}"),
+                Color::Indexed(n) => format!("{base};5;{n}"),
+                Color::Reset => format!("{}", if fg { 39 } else { 49 }),
+                other => {
+                    let named = [
+                        Color::Black,
+                        Color::Red,
+                        Color::Green,
+                        Color::Yellow,
+                        Color::Blue,
+                        Color::Magenta,
+                        Color::Cyan,
+                        Color::Gray,
+                        Color::DarkGray,
+                        Color::LightRed,
+                        Color::LightGreen,
+                        Color::LightYellow,
+                        Color::LightBlue,
+                        Color::LightMagenta,
+                        Color::LightCyan,
+                        Color::White,
+                    ];
+                    let i = named.iter().position(|x| *x == other).unwrap_or(7) as u8;
+                    format!("{base};5;{i}")
+                }
+            }
+        }
+        let mut out = String::new();
+        for y in 0..b.area.height {
+            for x in 0..b.area.width {
+                let c = &b[(x, y)];
+                let bold = if c.modifier.contains(Modifier::BOLD) {
+                    "1;"
+                } else {
+                    ""
+                };
+                out.push_str(&format!(
+                    "\x1b[0;{bold}{};{}m{}",
+                    sgr(c.fg, true),
+                    sgr(c.bg, false),
+                    c.symbol()
+                ));
+            }
+            out.push_str("\x1b[0m\n");
+        }
+        out
+    }
+
     fn html(b: &Buffer) -> String {
         let (w, h) = (b.area.width, b.area.height);
         {

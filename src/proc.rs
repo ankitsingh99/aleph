@@ -739,7 +739,8 @@ mod tests {
         let (o, _) = stream_watch(
             Command::new("sh").args([
                 "-c",
-                "if : >/dev/tty 2>/dev/null; then echo tty; else echo none; fi",
+                // (a subshell: dash exits on a special builtin's failed redirection)
+                "if (: >/dev/tty) 2>/dev/null; then echo tty; else echo none; fi",
             ]),
             Duration::from_secs(10),
             None,

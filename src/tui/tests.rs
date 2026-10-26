@@ -1056,6 +1056,29 @@ fn ctrl_k_opens_the_palette_while_typing_into_an_agent() {
 }
 
 #[test]
+fn ctrl_a_opens_the_approvals_while_typing_when_something_waits() {
+    let mut d = dash();
+    let _ = render(&mut d, 160, 30);
+    d.fv.sel = Some(fleet::RowId::Sess("b31|w1:p1".into()));
+    d.on_key(k(KeyCode::Enter));
+    assert!(d.wall.in_focus() && d.wall.typing);
+    // temper needs you: ctrl+a is the board's
+    assert!(d.fleet.sessions().iter().any(|s| s.blocked()));
+    d.on_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+    assert!(matches!(d.mode, Mode::Approvals));
+    d.on_key(k(KeyCode::Esc));
+    assert!(matches!(d.mode, Mode::Normal) && d.wall.typing);
+    // nothing waits: ctrl+a is the agent's (the start of its line)
+    for h in d.fleet.hosts.iter_mut() {
+        for s in h.sessions.iter_mut().filter(|s| s.blocked()) {
+            s.status = "working".into();
+        }
+    }
+    d.on_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+    assert!(matches!(d.mode, Mode::Normal) && d.wall.typing);
+}
+
+#[test]
 fn enter_opens_focus_and_w_tiles() {
     let mut d = dash();
     let _ = render(&mut d, 120, 30);
@@ -1934,6 +1957,13 @@ fn fleet_manages_machines_without_a_hosts_tab() {
     let s = render(&mut d, 160, 40);
     assert!(s.contains("Edit b31") && s.contains("Jump via"), "{s}");
     d.mode = Mode::Normal;
+    // a first Z only asks (a slip of shift on z mustn't stop watching it)
+    d.on_key(KeyEvent::new(KeyCode::Char('Z'), KeyModifiers::SHIFT));
+    assert!(!d.fleet.host("b31").unwrap().paused);
+    assert!(d
+        .toasts
+        .iter()
+        .any(|t| t.text.contains("Z again to pause b31")));
     d.on_key(KeyEvent::new(KeyCode::Char('Z'), KeyModifiers::SHIFT));
     assert!(d.fleet.host("b31").unwrap().paused);
     let s = render(&mut d, 160, 40);

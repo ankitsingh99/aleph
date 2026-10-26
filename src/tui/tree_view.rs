@@ -4,8 +4,9 @@
 //! (and its machine's logs asked to be read then too), folds kept per
 //! session. The wheel scrolls it, a click folds or opens a row; in Monitor ›
 //! Timeline the keys too: j/k, PgUp/PgDn, enter/space fold, ← → close /
-//! open, z / Z everything, [ ] prompts, e the next error, f follows the end,
-//! w words (read live from the machine, never kept).
+//! open, z / Z everything, v by session › by prompt › every step (what ran
+//! under each, counted), [ ] prompts, e the next error, f follows the end, w
+//! words (read live from the machine, never kept).
 
 use super::Dash;
 use crate::timeline::{self, Fold, Row, RowKind, Tree};
@@ -37,6 +38,8 @@ pub(crate) struct State {
     pub words: HashMap<String, String>,
     pub show_words: bool,
     words_for: Option<Key>,
+    /// the last level `v` folded to (0 sessions, 1 prompts, 2 every step)
+    pub level: u8,
     /// the session is working now (its last prompt is still open)
     pub running: bool,
     pub mode: Option<Fold>,
@@ -318,6 +321,45 @@ pub(crate) fn draw(d: &mut Dash, f: &mut Frame, r: Rect, focused: bool) {
     let _ = k;
 }
 
+/// Fold the tree to a level: 0 each session (and subagent) on a line, 1 each
+/// prompt, 2 every step open.
+fn fold_to(d: &mut Dash, level: u8) {
+    let all = rows(d);
+    match level {
+        0 => {
+            d.tv.toggled.insert("L".into(), false);
+            for r in all.iter().filter(|r| r.kind == RowKind::Lane) {
+                d.tv.toggled.insert(r.id.clone(), false);
+            }
+        }
+        _ => {
+            d.tv.toggled.insert("L".into(), true);
+            // open level by level, nested subagents too
+            for _ in 0..8 {
+                let now = rows(d);
+                let mut more = false;
+                for r in now
+                    .iter()
+                    .filter(|r| r.folded && (r.kind == RowKind::Lane || (level == 2 && r.foldable)))
+                {
+                    d.tv.toggled.insert(r.id.clone(), true);
+                    more = true;
+                }
+                if !more {
+                    break;
+                }
+            }
+            if level == 1 {
+                for r in rows(d).iter().filter(|r| r.kind == RowKind::Prompt) {
+                    d.tv.toggled.insert(r.id.clone(), false);
+                }
+            }
+        }
+    }
+    d.tv.sel = 0;
+    d.tv.scroll = 0;
+}
+
 fn toggle(d: &mut Dash, i: usize) {
     let all = rows(d);
     if let Some(row) = all.get(i).filter(|r| r.foldable) {
@@ -401,6 +443,22 @@ pub(crate) fn key(d: &mut Dash, k: &KeyEvent) -> bool {
                 }
                 None => {}
             }
+        }
+        // folded to a level, in turn (`v`): each session (and subagent) a line,
+        // each prompt a line, every step — with what ran under each; enter or
+        // a click still opens or closes any one of them
+        KeyCode::Char('v') => {
+            let level = (d.tv.level + 1) % 3;
+            d.tv.level = level;
+            fold_to(d, level);
+            d.toast(
+                super::Level::Info,
+                [
+                    "by session: what ran in each",
+                    "by prompt: the steps of each",
+                    "every step",
+                ][level as usize],
+            );
         }
         KeyCode::Char('z') => {
             for r in all.iter().filter(|r| r.foldable) {
@@ -498,6 +556,7 @@ pub(crate) fn hints() -> Vec<(&'static str, &'static str)> {
         ("j k", "move"),
         ("enter", "fold"),
         ("z Z", "all"),
+        ("v", "by session · prompt · step"),
         ("[ ]", "prompts"),
         ("e", "next error"),
         ("f", "follow"),

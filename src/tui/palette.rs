@@ -171,7 +171,7 @@ impl Palette {
         }
         for h in &d.fleet.hosts {
             for s in &h.sessions {
-                let (st, col) = super::fleet::status_spans(s, d.t0);
+                let (st, col) = super::fleet::status_for(d, s);
                 items.push((
                     Item::Session(s.key()),
                     format!("{} {}", s.glyph(), s.display()),

@@ -1552,6 +1552,12 @@ pub const KNOWN: &[Known] = &[
         help: "the agents whose sessions get the OpenRouter key: agent ids (the ones that read OPENROUTER_API_KEY themselves), all (-id leaves one out), or off. OpenCode, Kilo, Pi and OMP also get a model picker in the new-session form",
     },
     Known {
+        key: "openrouter.models",
+        default: "all",
+        kind: Kind::Choice(&["all", "free", "paid"]),
+        help: "which of OpenRouter's models to use: all, only the free ones ($0, the :free variants), or only paid ones. The new-session form's model picker lists just those, and OpenCode sessions Aleph starts get the same as their own config (OPENCODE_CONFIG_CONTENT: provider.openrouter.whitelist / blacklist; your opencode.json is never touched)",
+    },
+    Known {
         key: "ui.whats_new",
         default: "on",
         kind: Kind::Choice(&["on", "off"]),

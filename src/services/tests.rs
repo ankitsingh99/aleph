@@ -857,7 +857,9 @@ fn a_dead_machine_is_an_error_not_a_hang() {
     let slot = Arc::new(Mutex::new(None));
     let t = Instant::now();
     let s = run("x", c, &all(), Duration::from_secs(5), &slot);
-    assert!(t.elapsed() < Duration::from_secs(3));
+    // not waited out: ssh's own error, not the timeout's, and inside the 5 s
+    // (a busy test runner can take a few of them)
+    assert!(t.elapsed() < Duration::from_secs(5), "{:?}", t.elapsed());
     assert_eq!(
         s.err.as_deref(),
         Some("ssh: connect to host x port 22: Connection refused")

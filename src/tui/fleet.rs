@@ -36,6 +36,9 @@ pub(crate) struct Preview {
     pub at: Instant,
 }
 
+/// How long a first `Z` waits for the second.
+const PAUSE_CONFIRM: Duration = Duration::from_secs(4);
+
 pub struct State {
     pub sel: Option<RowId>,
     idx: usize,
@@ -57,6 +60,9 @@ pub struct State {
     pub timeline_panel: bool,
     /// where the last draw left room for it
     pub(crate) timeline_area: Option<Rect>,
+    /// `Z` once on a machine: it pauses on a second `Z` (a slip of shift on
+    /// `z` mustn't stop watching it)
+    pub(crate) pause_armed: Option<(String, Instant)>,
 }
 
 impl State {
@@ -77,6 +83,7 @@ impl State {
             stats_mode: 0,
             linemap: Vec::new(),
             others_open: false,
+            pause_armed: None,
         }
     }
 
@@ -915,6 +922,19 @@ pub(crate) fn run_act(d: &mut Dash, act: Act) -> Option<Handoff> {
         Act::PauseHost => {
             let h = host?;
             let paused = d.fleet.host(&h).is_some_and(|x| x.paused);
+            // pausing stops every alert, state and question from it: asked twice
+            let armed =
+                d.fv.pause_armed
+                    .take()
+                    .is_some_and(|(a, t)| a == h && t.elapsed() < PAUSE_CONFIRM);
+            if !paused && !armed {
+                d.fv.pause_armed = Some((h.clone(), Instant::now()));
+                d.toast(
+                    super::Level::Warn,
+                    format!("Z again to pause {h}: it stops being watched (no states, questions or alerts) until you resume it"),
+                );
+                return None;
+            }
             let key = format!("host.{h}.paused");
             let r = if paused {
                 d.cfg.unset(&key)
@@ -932,9 +952,10 @@ pub(crate) fn run_act(d: &mut Dash, act: Act) -> Option<Handoff> {
                 d.fleet.refresh(Some(&h));
                 d.note(format!("{h} resumed"));
             } else {
-                d.note(format!(
-                    "{h} paused — not polled until Z again (its sessions keep running)"
-                ));
+                d.toast(
+                    super::Level::Warn,
+                    format!("{h} paused — not watched until Z again (its sessions keep running)"),
+                );
             }
         }
         Act::HostColor => {
@@ -1143,6 +1164,15 @@ fn dur_since(since: Option<u64>) -> String {
     since
         .map(|t| ui::dur(crate::cache::now().saturating_sub(t)))
         .unwrap_or_default()
+}
+
+/// [`status_spans`], unless its machine is paused: then what it showed last
+/// isn't news (`⏸ paused`).
+pub(crate) fn status_for(d: &Dash, s: &Session) -> (String, Color) {
+    if d.fleet.host(&s.host).is_some_and(|h| h.paused) {
+        return ("⏸ paused · not watched".into(), c::YELLOW());
+    }
+    status_spans(s, d.t0)
 }
 
 /// `▲ needs you · 4m` etc.
@@ -1571,7 +1601,7 @@ pub(crate) fn lead(
     guide: &str,
 ) -> Vec<Span<'static>> {
     let marked = d.fv.marked.contains(&s.key());
-    let (st, col) = status_spans(s, d.t0);
+    let (st, col) = status_for(d, s);
     let base = ui::fg(col).add_modifier(if s.blocked() {
         Modifier::BOLD
     } else {
@@ -1751,15 +1781,16 @@ pub(crate) fn draw(d: &mut Dash, f: &mut Frame, r: Rect) {
         .max()
         .unwrap_or(8)
         .clamp(8, 22);
-    // the status column fits the widest status ("◷ limit · back in 2h 13m")
+    // the status column fits the widest status ("◷ limit · back in 2h 13m"),
+    // with a gap before the folder
     let sw = d
         .fleet
         .sessions()
         .iter()
-        .map(|s| ui::width(&status_spans(s, d.t0).0))
+        .map(|s| ui::width(&status_for(d, s).0) + 2)
         .max()
         .unwrap_or(18)
-        .clamp(18, 28);
+        .clamp(18, 30);
     // the fleet-wide strip
     let r = if r.height >= 14 && r.width >= 50 {
         let [top, rest] = Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(r);
@@ -2251,7 +2282,7 @@ fn draw_session_in(
     let inner = block.inner(r);
     f.render_widget(block, r);
     let w = inner.width as usize;
-    let (st, col) = status_spans(s, d.t0);
+    let (st, col) = status_for(d, s);
     let mut lines: Vec<Line> = Vec::new();
     if !s.title.is_empty() {
         for l in ui::wrap(&s.title, w).into_iter().take(2) {
@@ -2282,6 +2313,32 @@ fn draw_session_in(
             Span::styled(format!("  · pane {}", s.pane_id), ui::faint()),
         ],
     ));
+    // the model it's on (its latest request), and the ones it was on before
+    if let Some(l) = super::usage::live_for(d, s).filter(|l| !l.model.is_empty()) {
+        let mut v = vec![Span::styled(
+            crate::timeline::short_model(&l.model),
+            ui::bold(),
+        )];
+        if !l.effort.is_empty() {
+            v.push(Span::styled(format!(" {}", l.effort), ui::muted()));
+        }
+        let before: Vec<String> = l
+            .models
+            .iter()
+            .filter(|m| **m != l.model)
+            .map(|m| crate::timeline::short_model(m))
+            .collect();
+        if !before.is_empty() {
+            v.push(Span::styled(
+                ui::trunc(
+                    &format!("  · before: {}", before.join(", ")),
+                    w.saturating_sub(24),
+                ),
+                ui::faint(),
+            ));
+        }
+        lines.push(kv("model", v));
+    }
     // what it runs on the GPU (telemetry::owner: processes in its folder)
     {
         let mine = d.gpu_of(s);

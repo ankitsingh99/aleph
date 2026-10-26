@@ -440,14 +440,18 @@ impl QuickStart {
             }
             right.push(l);
         }
-        if matches!(
-            d.agents.status(&self.host),
-            crate::agentwatch::Status::Checking
-        ) {
-            right.push(Line::from(Span::styled(
+        match d.agents.status(&self.host) {
+            crate::agentwatch::Status::Checking => right.push(Line::from(Span::styled(
                 format!("  {} checking what's installed…", ui::spinner(d.t0)),
                 ui::muted(),
-            )));
+            ))),
+            crate::agentwatch::Status::Ready {
+                refreshing: true, ..
+            } => right.push(Line::from(Span::styled(
+                format!("  {} looking again…", ui::spinner(d.t0)),
+                ui::faint(),
+            ))),
+            _ => {}
         }
         f.render_widget(Paragraph::new(left), a);
         f.render_widget(Paragraph::new(right), b);
@@ -617,6 +621,8 @@ pub(crate) enum QuickRes {
 
 /// Open Quick start for a machine; its workspaces load in the background.
 pub(crate) fn open(d: &mut Dash, host: &str) {
+    d.agents
+        .refresh_if_older(host, std::time::Duration::from_secs(30));
     let q = QuickStart::new(d, host);
     let (gen, h) = (q.gen, host.to_string());
     let (t, tx) = (d.target_of(host), d.tx.clone());
@@ -885,7 +891,7 @@ impl CloseList {
         let skip = self.at.saturating_sub(13);
         for (i, (s, on)) in self.items.iter().enumerate().skip(skip).take(14) {
             let sel = i == self.at;
-            let (st, scol) = super::fleet::status_spans(s, d.t0);
+            let (st, scol) = super::fleet::status_for(d, s);
             let mut l = vec![
                 Span::styled(if sel { "┃" } else { " " }, ui::fg(c::ACCENT())),
                 Span::styled(

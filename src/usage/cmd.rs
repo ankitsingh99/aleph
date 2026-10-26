@@ -158,9 +158,12 @@ fn trim(v: f64, unit: &str) -> String {
     }
 }
 
-/// `$142.10`, `$0.03`, `<$0.01`, `–`.
+/// `$142.10`, `$0.03`, `<$0.01`, `free` (free models only), `–`.
 pub fn money(r: &Row) -> String {
     let c = r.cost();
+    if r.all_free() {
+        return "free".into();
+    }
     if c <= 0.0 {
         return if r.unpriced > 0 {
             "?".into()
@@ -188,6 +191,10 @@ fn cost_text(r: &Row) -> String {
     }
     if r.estimated() {
         s.push_str(" est.");
+    }
+    // some of it on free models: said, beside what the rest cost
+    if r.free > 0 && !r.all_free() {
+        s.push_str(&format!(" · {} free", r.free));
     }
     s
 }
@@ -258,6 +265,7 @@ pub(crate) fn row_json(by: By, r: &Row) -> Value {
         "cost_estimated": (r.cost_estimated * 1e6).round() / 1e6,
         "estimated": r.estimated(),
         "unpriced_requests": r.unpriced,
+        "free_requests": r.free,
         "web_searches": r.web,
         "first": r.first,
         "last": r.last,
@@ -285,6 +293,7 @@ const COLS: &[&str] = &[
     "cost_estimated",
     "unpriced_requests",
     "prompts",
+    "free_requests",
 ];
 
 fn cells(by: By, r: &Row) -> Vec<String> {
@@ -309,6 +318,7 @@ fn cells(by: By, r: &Row) -> Vec<String> {
         usd(r.cost_estimated),
         r.unpriced.to_string(),
         r.prompts.to_string(),
+        r.free.to_string(),
     ]
 }
 

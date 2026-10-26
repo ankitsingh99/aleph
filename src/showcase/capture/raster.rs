@@ -122,8 +122,8 @@ impl Canvas {
         let rgb = [c.0, c.1, c.2];
         for y in y0..y1 {
             let row = &mut self.px[(y * self.w + x0) * 3..(y * self.w + x1) * 3];
-            for p in row.chunks_exact_mut(3) {
-                p.copy_from_slice(&rgb);
+            for p in row.as_chunks_mut::<3>().0 {
+                *p = rgb;
             }
         }
     }
@@ -139,7 +139,7 @@ impl Canvas {
         };
         for y in y0..y1 {
             let row = &mut self.px[(y * self.w + x0) * 3..(y * self.w + x1) * 3];
-            for p in row.chunks_exact_mut(3) {
+            for p in row.as_chunks_mut::<3>().0 {
                 over(p, c, a);
             }
         }
@@ -278,7 +278,7 @@ impl Canvas {
                     }
                 }
                 xs.sort_by(f32::total_cmp);
-                for pair in xs.chunks_exact(2) {
+                for pair in xs.as_chunks::<2>().0 {
                     let (l, r) = (pair[0] - x0 as f32, pair[1] - x0 as f32);
                     span(&mut row, l.max(0.0), r.min(n as f32), 1.0 / S as f32);
                 }

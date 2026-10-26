@@ -135,11 +135,14 @@ fi
 
 if (( BUILD )); then
   command -v cargo >/dev/null || { echo "cargo not found — install Rust (https://rustup.rs) or use --no-build" >&2; exit 1; }
+  # cargo's own lines (every crate, where an old copy came from) only when it fails
+  echo "  building Aleph (a few minutes the first time)…"
   if [[ -n $FEATURES ]]; then
-    cargo install --locked --path . --features "$FEATURES"
+    ALEPH_SRC="$PWD" cargo install --quiet --locked --path . --features "$FEATURES"
   else
-    cargo install --locked --path .
-  fi
+    ALEPH_SRC="$PWD" cargo install --quiet --locked --path .
+  fi || { echo "error: the build failed (cargo's output is above)" >&2; exit 1; }
+  echo "✓ built $("${CARGO_HOME:-$HOME/.cargo}/bin/aleph" version 2>/dev/null | head -n 1 | sed 's/^[^a-z]*//')"
 fi
 BIN=$(command -v aleph || true)
 [[ -n $BIN ]] || BIN="${CARGO_HOME:-$HOME/.cargo}/bin/aleph"
@@ -147,6 +150,58 @@ BIN=$(command -v aleph || true)
 # the old name keeps working for scripts, Raycast and the old service
 OLDBIN="$(dirname "$BIN")/claude-herdr"
 if [[ -f $OLDBIN && ! -L $OLDBIN ]]; then ln -sf aleph "$OLDBIN"; fi
+
+# ---- `aleph` on your PATH, so it runs as is. Without sudo when it can be: a
+# link in a folder already on your PATH that you can write to works at once;
+# root's /usr/local/bin only with a yes (and your password); else a PATH line
+# in your shell's rc file, for new shells.
+BINDIR=$(dirname "$BIN")
+on_path() { case ":$PATH:" in *":$1:"*) return 0 ;; esac; return 1; }
+READY="" PATHLINE=0
+if on_path "$BINDIR" || [[ $(command -v aleph 2>/dev/null) == "$BIN" ]]; then
+  READY=$BINDIR
+else
+  for d in "$HOME/.local/bin" "$HOME/bin" /opt/homebrew/bin /usr/local/bin; do
+    if on_path "$d" && [[ -d $d && -w $d ]] && ln -sf "$BIN" "$d/aleph" 2>/dev/null; then
+      READY=$d; echo "✓ linked aleph into $d (on your PATH)"; break
+    fi
+  done
+  if [[ -z $READY ]] && on_path /usr/local/bin && [[ -t 0 ]]; then
+    say "$BINDIR isn't on your PATH. /usr/local/bin is, but it belongs to root, so linking aleph there needs sudo:"
+    echo "    sudo ln -sf \"$BIN\" /usr/local/bin/aleph"
+    # asked even with --yes: it's your password
+    read -r -p "  Run that now (sudo asks for your password)? [y/N] " a || a=""
+    if [[ $a == [Yy]* ]]; then
+      if sudo mkdir -p /usr/local/bin && sudo ln -sf "$BIN" /usr/local/bin/aleph; then
+        READY=/usr/local/bin; echo "✓ linked aleph into /usr/local/bin"
+      else
+        echo "  that didn't work — run the line above yourself" >&2
+      fi
+    fi
+  fi
+  [[ -n $READY ]] || PATHLINE=1
+fi
+qdir=$(printf '%s' "$BINDIR" | sed 's/[\\"$`]/\\&/g')
+# a PATH line for a shell other than zsh (zsh's is in its block below)
+if (( PATHLINE )); then
+  case ${SHELL##*/} in
+    zsh) ;;
+    bash)
+      if [[ $OS == Darwin ]]; then brc=$HOME/.bash_profile; else brc=$HOME/.bashrc; fi
+      line="export PATH=\"$qdir:\$PATH\"   # aleph"
+      if grep -qsF "$line" "$brc" || { touch "$brc" && echo "$line" >> "$brc"; }; then
+        echo "✓ ${brc/#$HOME/~}: $BINDIR on the PATH (new shells)"
+      else
+        echo "warning: couldn't write $brc — add this line to it yourself:" >&2
+        echo "    $line" >&2
+      fi
+      ;;
+    *)
+      echo "warning: add $BINDIR to your PATH in your shell's config, e.g.:" >&2
+      echo "    export PATH=\"$BINDIR:\$PATH\"" >&2
+      ;;
+  esac
+fi
 
 RC="${ZDOTDIR:-$HOME}/.zshrc"
 BEGIN='# >>> aleph >>>' END='# <<< aleph <<<'
@@ -165,6 +220,7 @@ awk -v b="$OLDB" -v e="$OLDE" -v b2="$BEGIN" -v e2="$END" '
 qbin=$(printf '%s' "$BIN" | sed 's/[\\"$`]/\\&/g')
 {
   echo "$BEGIN"
+  if (( PATHLINE )); then echo "export PATH=\"$qdir:\$PATH\""; fi
   echo "$NAME() { \"$qbin\" \"\$@\"; }"
   for n in $OLDNAMES; do
     [[ $n == "$NAME" || $n == aleph || $n == "$WRAP" ]] && continue
@@ -205,7 +261,11 @@ if (( RAYCAST )); then
     echo "warning: --raycast needs Node.js and npm — skipped" >&2
   fi
 fi
-echo "then: source $RC && $NAME doctor"
+if [[ -n $READY ]]; then
+  echo "✓ ready: aleph runs from any shell now ($NAME: open a new terminal, or source $RC)"
+else
+  echo "✓ $BINDIR goes on the PATH in new shells — open a new terminal (or: exec \$SHELL -l), then: aleph"
+fi
 if (( DEFAULTS )) && [[ -t 0 && -t 1 ]]; then
   # quick start: every default, installed on the install screen, then Aleph
   exec "$BIN" setup --defaults

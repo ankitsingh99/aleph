@@ -1077,7 +1077,7 @@ fn now_state(d: &Dash, it: &Item) -> (String, Color) {
         },
         _ => match &s {
             Some(s) => {
-                let (t, col) = super::fleet::status_spans(s, d.t0);
+                let (t, col) = super::fleet::status_for(d, s);
                 (format!("now {t}"), col)
             }
             None if !e.name.is_empty() => ("– not running now".into(), c::FAINT()),
@@ -2523,7 +2523,9 @@ fn item_line(d: &Dash, it: &Item, selected: bool, cl: &Cols, part: u8) -> Line<'
         let indent = 1 + cl.time + GAP;
         let live = live_session(d, e);
         let about = match (&live, e.kind) {
-            (Some(s), _) if s.blocked() => {
+            // (only a question's own row: what the session finished or
+            // started before it asked is told as such)
+            (Some(s), Kind::Blocked) if s.blocked() => {
                 format!(
                     "asks: {}",
                     if e.title.is_empty() {

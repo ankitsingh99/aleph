@@ -63,6 +63,12 @@ impl Record {
     pub fn us(&self) -> bool {
         self.flags.contains('u')
     }
+    /// The provider charged nothing: a `…:free` model (OpenRouter's free
+    /// variants), or OpenCode's own models where OpenCode says $0. Its cost
+    /// is a known zero, never estimated from the paid model's price.
+    pub fn free(&self) -> bool {
+        self.flags.contains('z')
+    }
     pub fn tokens(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write_5m + self.cache_write_1h
     }
@@ -227,7 +233,14 @@ pub fn from_wire(line: &str, host: &str, agent: &str) -> Option<Record> {
                 cache_write_1h: n(f[11]),
                 reasoning: n(f[12]),
                 cost,
-                flags: f[14].chars().filter(|c| c.is_ascii_alphabetic()).collect(),
+                flags: {
+                    let mut fl: String =
+                        f[14].chars().filter(|c| c.is_ascii_alphabetic()).collect();
+                    if f[4].trim().to_ascii_lowercase().ends_with(":free") && !fl.contains('z') {
+                        fl.push('z');
+                    }
+                    fl
+                },
                 web: n(f[15]),
                 turn_ms: 0,
                 acct: f

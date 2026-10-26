@@ -212,3 +212,31 @@ fn no_key_no_session_env() {
     assert!(!crate::log::redact(&format!("x {FAKE} y")).contains(FAKE));
     forget();
 }
+
+#[test]
+fn free_or_paid_only_as_opencodes_own_config() {
+    let v: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/openrouter/models.json")).unwrap();
+    let all = parse_models(&v);
+    assert!(all
+        .iter()
+        .any(|m| m.id == "qwen/qwen3-coder:free" && is_free(m)));
+    assert!(!is_free(
+        all.iter().find(|m| m.id == "qwen/qwen3-coder").unwrap()
+    ));
+    let free: Value = serde_json::from_str(&opencode_config_for("free", &all).unwrap()).unwrap();
+    assert_eq!(
+        free["provider"]["openrouter"]["whitelist"],
+        json!(["qwen/qwen3-coder:free"])
+    );
+    let paid: Value = serde_json::from_str(&opencode_config_for("paid", &all).unwrap()).unwrap();
+    assert_eq!(
+        paid["provider"]["openrouter"]["blacklist"],
+        json!(["qwen/qwen3-coder:free"])
+    );
+    assert!(opencode_config_for("all", &all).is_none());
+    assert!(
+        opencode_config_for("free", &[]).is_none(),
+        "no list: nothing to name"
+    );
+}

@@ -689,7 +689,9 @@ pub fn card(l: &Layout, cols: u16, rows: u16, look: &Card, ink: &Ink, f: &mut Fo
         );
         let mut a: Vec<f32> = mask
             .px
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|p| p[0] as f32 / 255.0)
             .collect();
         blur(&mut a, mw, mh, r);

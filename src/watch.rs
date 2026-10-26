@@ -168,6 +168,8 @@ pub fn cmd(mut a: Args) -> ExitCode {
                 a.cfg = crate::config::Config::load();
                 crate::theme::assign_machine_colors(&mut a.cfg);
                 f.outages = crate::fleet::Outages::from_cfg(&a.cfg);
+                // a machine paused or resumed (a dashboard's Z, aleph settings)
+                f.follow_paused(&a.cfg);
                 if cfg_stamp.is_some() {
                     crate::log::info("daemon", "the settings changed: read them again");
                 }
@@ -789,6 +791,28 @@ pub fn deliver_event(cfg: &crate::config::Config, e: &crate::events::Event) -> b
 fn deliver(n: &Note) -> bool {
     let tn = proc::which("terminal-notifier").is_some();
     let Some((prog, args)) = delivery(n, std::env::consts::OS, tn, &shortcuts::warp_dir()) else {
+        return false;
+    };
+    let o = proc::cap(&prog, &args, T_NOTIFY);
+    if o.ok() || !tn {
+        return o.ok();
+    }
+    // terminal-notifier is there but may not notify (macOS took its
+    // permission: exit 3, "tccutil reset UserNotification …"): osascript's
+    // notification instead, and the log says why once
+    static SAID: std::sync::Once = std::sync::Once::new();
+    SAID.call_once(|| {
+        crate::log::warn(
+            "notify",
+            &format!(
+                "terminal-notifier didn't notify (exit {:?}: {}) — using osascript; allow terminal-notifier in System Settings › Notifications to get its clickable banners back",
+                o.code,
+                o.stderr.trim().lines().last().unwrap_or("")
+            ),
+        )
+    });
+    let Some((prog, args)) = delivery(n, std::env::consts::OS, false, &shortcuts::warp_dir())
+    else {
         return false;
     };
     proc::cap(&prog, &args, T_NOTIFY).ok()

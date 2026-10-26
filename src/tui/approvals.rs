@@ -589,6 +589,27 @@ pub(crate) fn draw(d: &mut Dash, f: &mut Frame, area: Rect) {
             ui::fg(c::ACCENT()).add_modifier(Modifier::BOLD),
         ));
     }
+    // machines whose questions can't show up here: paused, or not answering
+    let unseen: Vec<String> = d
+        .fleet
+        .hosts
+        .iter()
+        .filter_map(|h| {
+            if h.paused {
+                Some(format!("⏸ {} paused (Z in Fleet resumes it)", h.alias))
+            } else if matches!(h.conn, crate::fleet::Conn::Down(_)) && !h.sessions.is_empty() {
+                Some(format!("✕ {} not answering", h.alias))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if !unseen.is_empty() {
+        title.push(Span::styled(
+            format!(" · {} — not watched", unseen.join(", ")),
+            ui::fg(c::YELLOW()),
+        ));
+    }
     let title = Line::from(title);
     let block = ui::panel(title, true);
     let inner = block.inner(r);

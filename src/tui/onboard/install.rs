@@ -200,6 +200,12 @@ pub(crate) fn key(w: &mut Wiz, k: KeyEvent) -> Option<Exit> {
             })
         }
         KeyCode::Enter if w.rv.waiting.is_some() => w.rv.go = true,
+        // handed in from the dashboard: no wizard to put it aside for
+        KeyCode::Esc if w.queue_only => {
+            if w.rv.done {
+                return Some(Exit::Dashboard { tour: false });
+            }
+        }
         KeyCode::Esc => {
             w.rv.hidden = true;
             w.rv.look = None;
@@ -418,8 +424,25 @@ pub(crate) fn draw(w: &mut Wiz, f: &mut Frame, area: Rect) {
         queue(w, f, q);
         self::card(w, f, card);
     }
-    // the keys
-    let keys: Vec<(&str, &str)> = if w.rv.done && bad == 0 {
+    // the keys (handed in from the dashboard: it's where esc and enter go back to)
+    let keys: Vec<(&str, &str)> = if w.queue_only && w.rv.done {
+        let mut v = vec![
+            ("enter", "back to aleph"),
+            ("↑↓", "what ran"),
+            ("l", "full log"),
+        ];
+        if bad > 0 {
+            v.splice(0..0, [("i", "retry this one"), ("r", "retry the failed")]);
+        }
+        v
+    } else if w.queue_only {
+        vec![
+            ("↑↓", "items"),
+            ("f", "follow"),
+            ("l", "full log"),
+            ("q", "leave"),
+        ]
+    } else if w.rv.done && bad == 0 {
         vec![
             ("enter", "open aleph"),
             ("↑↓", "what ran"),

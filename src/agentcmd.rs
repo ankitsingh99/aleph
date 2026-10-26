@@ -238,6 +238,12 @@ pub fn to_json(probes: &[HostProbe]) -> serde_json::Value {
                 "installed": f.is_some(),
                 "path": f.map(|f| f.path.clone()),
                 "version": f.map(|f| f.version.clone()),
+                "supported": f.and_then(|f| match ag.support(&f.version) {
+                    agents::Support::Yes => Some(true),
+                    agents::Support::Old => Some(false),
+                    agents::Support::Unknown => None,
+                }),
+                "min_version": (!ag.min_version.is_empty()).then_some(ag.min_version),
                 "check": f.map(|f| f.check.as_str()),
                 "on_path": f.and_then(|f| f.on_path),
                 "shadowed_by": f.and_then(|f| f.shadowed_by.clone()),
@@ -392,6 +398,9 @@ pub fn notes(p: &HostProbe) -> Vec<Line<'static>> {
         ])
     };
     for (ag, f) in p.installed() {
+        if let Some(t) = ag.old_note(&f.version) {
+            v.push(warn(t));
+        }
         if let Some(s) = &f.shadowed_by {
             v.push(warn(format!("{}: {}", ag.name, shadow_text(p, ag, s))));
         } else if f.on_path == Some(false) {
@@ -486,10 +495,10 @@ pub fn print_matrix(cfg: &Config, probes: &[HostProbe], all: bool) {
     let wv = rows
         .iter()
         .filter_map(|(p, ag)| p.agent(ag.id))
-        .map(|f| ui::width(&f.version))
+        .map(|f| ui::width(&f.version) + 2)
         .max()
         .unwrap_or(7)
-        .clamp(7, 18);
+        .clamp(7, 20);
     let wi = rows
         .iter()
         .map(|(p, ag)| ui::width(&integ_cell(p, ag).0))
@@ -556,14 +565,14 @@ pub fn print_matrix(cfg: &Config, probes: &[HostProbe], all: bool) {
                     } else {
                         &f.version
                     };
-                    l.push(Span::styled(
-                        ui::pad(&ui::trunc(v, wv), wv),
-                        if f.version.is_empty() {
-                            ui::faint()
-                        } else {
-                            ui::muted()
-                        },
-                    ));
+                    let (mark, st) = match ag.support(&f.version) {
+                        agents::Support::Yes => (" ✓", ui::fg(c::GREEN())),
+                        agents::Support::Old => (" ⚠", ui::fg(c::YELLOW())),
+                        agents::Support::Unknown if f.version.is_empty() => ("", ui::faint()),
+                        agents::Support::Unknown => ("", ui::muted()),
+                    };
+                    let v = format!("{}{mark}", ui::trunc(v, wv.saturating_sub(2)));
+                    l.push(Span::styled(ui::pad(&v, wv), st));
                     l.push(Span::raw("  "));
                     l.push(Span::styled(ui::pad(&it, wi), ui::fg(ic)));
                     l.push(Span::raw("  "));
@@ -769,9 +778,13 @@ pub fn apply(steps: &[Step]) -> (usize, usize) {
     (good, bad)
 }
 
+/// One `sh -s` installing herdr integrations, a `CCX` line each. An agent
+/// installed but never started has no folder yet ("… config directory not
+/// found at ~/.gemini/config. install antigravity cli first"): the folder is
+/// made, inside the home folder only, and the install tried once more.
 fn install_script(names: &[&str]) -> String {
     format!(
-        "LC_ALL=C; export LC_ALL\nfor n in {}; do if o=$(herdr integration install \"$n\" </dev/null 2>&1); then r=ok; else r=fail; fi; printf 'CCX\\t%s\\t%s\\t%s\\n' \"$n\" \"$r\" \"$(printf '%s\\n' \"$o\" | grep . | tail -n 1 | tr -d '\\t')\"; done\n",
+        "LC_ALL=C; export LC_ALL\nfor n in {}; do o=$(herdr integration install \"$n\" </dev/null 2>&1); r=$?; if [ $r != 0 ]; then d=$(printf '%s\\n' \"$o\" | sed -n 's/.* not found at \\(\\/[^ ]*\\)\\. install .*/\\1/p' | head -n 1); case $d in \"$HOME\"/?*) mkdir -p \"$d\" && {{ o=$(herdr integration install \"$n\" </dev/null 2>&1); r=$?; }} ;; esac; fi; if [ $r = 0 ]; then r=ok; else r=fail; fi; printf 'CCX\\t%s\\t%s\\t%s\\n' \"$n\" \"$r\" \"$(printf '%s\\n' \"$o\" | grep . | tail -n 1 | tr -d '\\t')\"; done\n",
         names.join(" ")
     )
 }
@@ -1111,6 +1124,36 @@ mod tests {
         );
         let s = install_script(&["claude", "antigravity-cli"]);
         assert!(s.contains("for n in claude antigravity-cli;"));
+    }
+
+    #[test]
+    fn a_fresh_agents_missing_folder_is_made_then_installed() {
+        let t = std::env::temp_dir().join(format!("aleph-integ-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let (home, bin) = (t.join("home"), t.join("bin"));
+        std::fs::create_dir_all(&home).unwrap();
+        std::fs::create_dir_all(&bin).unwrap();
+        // herdr as it answers before the agent first ran; outside the home: never made
+        let fake = "#!/bin/sh\ncase $3 in agy) d=$HOME/.gemini/config ;; *) d=/nonexistent/aleph-test ;; esac\n[ -d \"$d\" ] && { echo installed; exit 0; }\necho \"$3 config directory not found at $d. install $3 first\"; exit 1\n";
+        std::fs::write(bin.join("herdr"), fake).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(bin.join("herdr"), std::fs::Permissions::from_mode(0o755))
+            .unwrap();
+        let mut c = std::process::Command::new("sh");
+        c.arg("-s")
+            .env("HOME", &home)
+            .env("PATH", format!("{}:/usr/bin:/bin", bin.to_string_lossy()));
+        let o = crate::proc::run(
+            &mut c,
+            std::time::Duration::from_secs(10),
+            Some(install_script(&["agy", "other"]).as_bytes()),
+        )
+        .unwrap();
+        let r = parse_install(&o.text());
+        assert_eq!(r[0], ("agy".into(), true, "installed".into()), "{r:?}");
+        assert!(home.join(".gemini/config").is_dir());
+        assert!(!r[1].1 && !std::path::Path::new("/nonexistent/aleph-test").exists());
+        let _ = std::fs::remove_dir_all(&t);
     }
 
     #[test]

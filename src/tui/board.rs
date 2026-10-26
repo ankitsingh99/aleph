@@ -761,7 +761,7 @@ fn cols(d: &Dash, rows: &[RowId], w: usize) -> Cols {
         .clamp(10, 22);
     let state = sessions
         .iter()
-        .map(|s| ui::width(&fleet::status_spans(s, d.t0).0))
+        .map(|s| ui::width(&fleet::status_for(d, s).0))
         .max()
         .unwrap_or(14)
         .clamp(14, 26);
@@ -803,7 +803,7 @@ fn sess_lines(
     on: bool,
     last: bool,
 ) -> (Line<'static>, Option<Line<'static>>) {
-    let (st, scol) = fleet::status_spans(s, d.t0);
+    let (st, scol) = fleet::status_for(d, s);
     let marked = d.fv.marked.contains(&s.key());
     let mut l = vec![
         Span::styled(if last { "    └ " } else { "    ├ " }, ui::faint()),

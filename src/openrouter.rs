@@ -632,6 +632,8 @@ pub struct Model {
     /// $ per million tokens in and out (None: variable, or not said)
     pub input: Option<f64>,
     pub output: Option<f64>,
+    /// $ per million cached input tokens read (None: not said)
+    pub cache_read: Option<f64>,
 }
 
 impl Model {
@@ -711,6 +713,7 @@ pub fn parse_models(v: &Value) -> Vec<Model> {
                     .unwrap_or(0.0) as u64,
                 input: pricing.and_then(|p| per_mtok(p.get("prompt"))),
                 output: pricing.and_then(|p| per_mtok(p.get("completion"))),
+                cache_read: pricing.and_then(|p| per_mtok(p.get("input_cache_read"))),
                 id,
             })
         })
@@ -727,7 +730,11 @@ fn models_json(at: u64, v: &[Model]) -> Value {
         "data": v.iter().map(|m| json!({
             "id": m.id, "name": m.name, "context_length": m.context,
             // kept as OpenRouter writes them ($ per token)
-            "pricing": {"prompt": m.input.map(|x| x / 1e6), "completion": m.output.map(|x| x / 1e6)},
+            "pricing": {
+                "prompt": m.input.map(|x| x / 1e6),
+                "completion": m.output.map(|x| x / 1e6),
+                "input_cache_read": m.cache_read.map(|x| x / 1e6),
+            },
         })).collect::<Vec<_>>(),
     })
 }
@@ -764,6 +771,98 @@ pub fn models() -> Result<Vec<Model>, String> {
             Some((_, v)) if !v.is_empty() => Ok(v),
             _ => Err(e),
         },
+    }
+}
+
+/// OpenRouter's paid models as a price list, from the kept model list (no
+/// request: it's read daily only with a key, `refresh_catalog`): (id, $/MTok
+/// in, out, cached read) and when it was read. Free ones are left out (their
+/// requests are marked free where they're read); kept in memory until the
+/// file changes.
+pub fn price_catalog() -> (u64, Arc<Vec<Priced>>) {
+    type Cat = (std::time::SystemTime, u64, Arc<Vec<Priced>>);
+    static KEPT: std::sync::Mutex<Option<Cat>> = std::sync::Mutex::new(None);
+    let Ok(mt) = std::fs::metadata(models_file()).and_then(|m| m.modified()) else {
+        return (0, Arc::new(Vec::new()));
+    };
+    let mut k = KEPT.lock().unwrap();
+    if let Some((t, at, v)) = k.as_ref() {
+        if *t == mt {
+            return (*at, v.clone());
+        }
+    }
+    let (at, list) = models_cached().unwrap_or_default();
+    let v = Arc::new(paid(list));
+    *k = Some((mt, at, v.clone()));
+    (at, v)
+}
+
+/// A paid model's price: its id, $/MTok in and out, and for cached input read.
+pub type Priced = (String, f64, f64, Option<f64>);
+
+/// The models with a price (free and variable ones left out) — pure.
+pub fn paid(list: Vec<Model>) -> Vec<Priced> {
+    list.into_iter()
+        .filter_map(|m| match (m.input, m.output) {
+            (Some(i), Some(o)) if i > 0.0 || o > 0.0 => Some((m.id, i, o, m.cache_read)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Free: OpenRouter charges nothing for it (a `:free` variant, or $0 both ways).
+pub fn is_free(m: &Model) -> bool {
+    m.id.ends_with(":free") || (m.input == Some(0.0) && m.output == Some(0.0))
+}
+
+/// OpenCode's own config for `openrouter.models` (pure): only the free ones
+/// (a whitelist), or none of them (a blacklist); None for all, or with no
+/// list to name them from.
+pub fn opencode_config_for(choice: &str, models: &[Model]) -> Option<String> {
+    let free: Vec<&str> = models
+        .iter()
+        .filter(|m| is_free(m))
+        .map(|m| m.id.as_str())
+        .collect();
+    let key = match choice {
+        "free" => "whitelist",
+        "paid" => "blacklist",
+        _ => return None,
+    };
+    if free.is_empty() {
+        return None;
+    }
+    Some(json!({"provider": {"openrouter": {key: free}}}).to_string())
+}
+
+/// [`opencode_config_for`] with the setting and the kept list (read now when
+/// there's none: a new session's thread, never the UI's).
+pub fn opencode_config(cfg: &Config) -> Option<String> {
+    let choice = cfg.get_or("openrouter.models");
+    if choice == "all" {
+        return None;
+    }
+    let list = match models_cached() {
+        Some((_, v)) if !v.is_empty() => v,
+        _ => models().ok()?,
+    };
+    opencode_config_for(&choice, &list)
+}
+
+/// The daemon's daily read of OpenRouter's model list (prices for models the
+/// agents don't price themselves) — only with a key set: without one, Aleph
+/// asks OpenRouter nothing.
+pub fn refresh_catalog(cfg: &Config) {
+    // a key stored, not just the setting's default pointing at the keystore
+    // (off the UI thread: the daemon's usage round)
+    if !configured(cfg) || key(cfg).is_none() {
+        return;
+    }
+    let fresh = models_cached().is_some_and(|(at, v)| {
+        !v.is_empty() && crate::cache::now().saturating_sub(at) < MODELS_FRESH
+    });
+    if !fresh {
+        let _ = models();
     }
 }
 

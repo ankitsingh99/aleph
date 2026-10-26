@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Fake zenity for tests (Linux's dialog, as osascript is macOS's): records the
+# call in $ST/log; a --question dialog answers yes when $ST/dialog names its
+# --ok-label button (none: cancelled), and its text goes to $ST/dialog.log.
+ST=${ST:?}; echo "zenity $*" >> "$ST/log"
+case " $* " in *" --question "*)
+  printf '%s\n---\n' "$*" >> "$ST/dialog.log"
+  ok=; prev=; for a in "$@"; do [ "$prev" = --ok-label ] && ok=$a; prev=$a; done
+  [ -f "$ST/dialog" ] && [ "$(cat "$ST/dialog")" = "$ok" ] && exit 0
+  exit 1 ;;
+esac

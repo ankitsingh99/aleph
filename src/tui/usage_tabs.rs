@@ -1,8 +1,8 @@
 //! Usage's screens (`usage.layout`): five tabs — Overview, Breakdown,
 //! Trends, Turns & sessions, Insights (`v` / `V`, or a click) — or all of it
 //! as one long page (j/k scroll it), or a pivot you build (rows `b`, split
-//! `s`, measure `n`, chart `c`). `L` cycles the three; `g` the split the
-//! breakup and daily columns use.
+//! `s`, measure `n`, chart `c`). `L` cycles the three. The breakup and the
+//! daily columns split by what the rows are (`b`, or `g`).
 
 use super::charts::{self, Part};
 use super::Dash;
@@ -20,7 +20,7 @@ pub(crate) const TABS: [&str; 5] = [
     "Insights",
 ];
 pub(crate) const LAYOUTS: [&str; 3] = ["tabs", "page", "pivot"];
-/// What the breakup splits by (`g`).
+/// What a row's split under it can be (the Breakdown tree, the pivot: `s`).
 pub(crate) const SPLITS: [(By, &str); 4] = [
     (By::Account, "account"),
     (By::Agent, "agent"),
@@ -39,7 +39,6 @@ pub(crate) struct View {
     pub tab: usize,
     /// 0 tabs, 1 page, 2 pivot (`usage.layout`, `L`)
     pub layout: Option<usize>,
-    pub split: usize,
     /// the pivot's split (`s`), measure (`n`), chart (`c`)
     pub pivot_split: usize,
     pub measure: usize,
@@ -152,7 +151,7 @@ fn kpis(f: &mut Frame, r: Rect, data: &Data) {
     let items: Vec<(&str, String, Span<'static>, Vec<f64>)> = vec![
         (
             "cost",
-            dash::money(t.cost(), t.estimated()),
+            dash::row_money(t),
             change(t.cost(), p.cost()),
             cost_days,
         ),
@@ -217,17 +216,14 @@ fn kpis(f: &mut Frame, r: Rect, data: &Data) {
     }
 }
 
-/// The cost broken down by the split (`g`): the bar and its legend.
+/// The cost broken down by what the rows are (`b`): the bar and its legend.
 fn breakup(d: &Dash, f: &mut Frame, r: Rect, data: &Data) {
     let m = &data.more;
-    let split = SPLITS[d.usage.view.split % SPLITS.len()].1;
+    let split = super::usage::by_name(d);
     let inner = panel(
         f,
         r,
-        &format!(
-            "{} · by {split} (g)",
-            dash::money(data.total.cost(), data.total.estimated())
-        ),
+        &format!("{} · by {split} (b)", dash::row_money(&data.total)),
     );
     if inner.height == 0 {
         return;
@@ -248,10 +244,10 @@ fn breakup(d: &Dash, f: &mut Frame, r: Rect, data: &Data) {
     lines(f, inner, v);
 }
 
-/// Cost a day, stacked by the split.
+/// Cost a day, stacked by what the rows are (`b`).
 fn daily(d: &Dash, f: &mut Frame, r: Rect, data: &Data) {
     let m = &data.more;
-    let split = SPLITS[d.usage.view.split % SPLITS.len()].1;
+    let split = super::usage::by_name(d);
     let inner = panel(f, r, &format!("cost by day · by {split}"));
     let cols: Vec<(String, Vec<f64>)> = m
         .daily
@@ -365,7 +361,7 @@ fn row_line(
         v.push(Span::raw(" "));
     }
     v.push(Span::styled(
-        format!("{:>9}", dash::money(r.cost(), r.estimated())),
+        format!("{:>9}", dash::row_money(r)),
         ui::fg(c::ACCENT()),
     ));
     v.push(Span::styled(
@@ -964,10 +960,8 @@ pub(crate) fn key(d: &mut Dash, k: &crossterm::event::KeyEvent) -> bool {
                 format!("usage as {}", ["tabs", "one long page", "a pivot"][n]),
             );
         }
-        KeyCode::Char('g') => {
-            v.split = (v.split + 1) % SPLITS.len();
-            super::usage::reload(d);
-        }
+        // the old key for the charts' split: the same "by" as `b` now
+        KeyCode::Char('g') => super::usage::step_by(d, 1),
         KeyCode::Char('s') => {
             v.pivot_split = (v.pivot_split + 1) % SPLITS.len();
             super::usage::reload(d);

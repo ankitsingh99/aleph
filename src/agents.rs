@@ -72,6 +72,11 @@ pub struct Agent {
     pub logs: Option<Logs>,
     /// its CLI's own flags that always pass through to it (`-p`, `--print`, …)
     pub flags: &'static [&'static str],
+    /// the oldest version Aleph is built and tested against (empty: any);
+    /// older ones get a warning wherever their version shows
+    pub min_version: &'static str,
+    /// how an older one moves up to `min_version`
+    pub upgrade: &'static str,
     /// its CLI's own subcommands that always pass through to it (`mcp`, …)
     pub cmds: &'static [&'static str],
 }
@@ -156,6 +161,8 @@ const fn a(id: &'static str, name: &'static str) -> Agent {
         logs: None,
         flags: &[],
         cmds: &[],
+        min_version: "",
+        upgrade: "",
     }
 }
 
@@ -212,7 +219,12 @@ pub const ALL: &[Agent] = &[
         integration: Some("opencode"),
         resume: &["--continue"],
         resume_id: &["--session", "{id}"],
-        install: "curl -fsSL https://opencode.ai/install | bash",
+        // OpenCode 2 (its own installer and npm package): sessions in new tables,
+        // which is what Aleph reads; the 1.x installer refuses 2.x
+        install: "curl -fsSL https://opencode.ai/v2/install | bash",
+        alt_install: "npm i -g @opencode/cli",
+        min_version: "2.0",
+        upgrade: "opencode upgrade --major",
         ..a("opencode", "OpenCode")
     },
     Agent {
@@ -479,6 +491,63 @@ pub fn label(kind: &str) -> String {
 
 /// Not an agent: a herdr tab with just your shell in it (`aleph local shell`).
 pub const SHELL: &str = "shell";
+
+/// Whether an installed version is one Aleph supports (`Agent::min_version`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Support {
+    /// at or past the floor
+    Yes,
+    /// older than the floor: untested, its usage may not be read
+    Old,
+    /// no floor, or a version that doesn't say (none read, a `0.0.0-…` nightly)
+    Unknown,
+}
+
+/// `v2.1.2`, `opencode 2.1.2 (abc)`, `2.0` → its numbers, three at least.
+fn version_nums(v: &str) -> Option<Vec<u64>> {
+    let at = v.find(|c: char| c.is_ascii_digit())?;
+    let core: String = v[at..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let mut n: Vec<u64> = core
+        .split('.')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().unwrap_or(0))
+        .collect();
+    n.resize(n.len().max(3), 0);
+    Some(n)
+}
+
+impl Agent {
+    pub fn support(&self, version: &str) -> Support {
+        if self.min_version.is_empty() {
+            return Support::Unknown;
+        }
+        match (version_nums(version), version_nums(self.min_version)) {
+            (Some(v), _) if v.iter().all(|&x| x == 0) => Support::Unknown,
+            (Some(v), Some(min)) if v >= min => Support::Yes,
+            (Some(_), Some(_)) => Support::Old,
+            _ => Support::Unknown,
+        }
+    }
+
+    /// The warning for a version older than the floor, with how to move up.
+    pub fn old_note(&self, version: &str) -> Option<String> {
+        (self.support(version) == Support::Old).then(|| {
+            format!(
+                "{} {version} is older than {}: untested, and its usage isn't tracked properly{}",
+                self.name,
+                self.min_version,
+                if self.upgrade.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", self.upgrade)
+                }
+            )
+        })
+    }
+}
 
 /// Look an agent up by id, herdr kind, executable, alias or display name.
 pub fn find(q: &str) -> Option<&'static Agent> {
@@ -916,6 +985,23 @@ pub(crate) mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn opencode_2_is_the_supported_one() {
+        let oc = find("opencode").unwrap();
+        assert!(oc.install.contains("opencode.ai/v2/install"));
+        assert_eq!(oc.support("2.1.2"), Support::Yes);
+        assert_eq!(oc.support("v2.0.0"), Support::Yes);
+        assert_eq!(oc.support("opencode 10.0.1"), Support::Yes);
+        assert_eq!(oc.support("1.19.4"), Support::Old);
+        assert_eq!(oc.support("0.0.0-beta-19507"), Support::Unknown);
+        assert_eq!(oc.support(""), Support::Unknown);
+        let note = oc.old_note("1.19.4").unwrap();
+        assert!(note.contains("older than 2.0") && note.contains("opencode upgrade --major"));
+        assert!(oc.old_note("2.1.4").is_none());
+        // agents without a floor never warn
+        assert_eq!(find("claude").unwrap().support("0.1"), Support::Unknown);
+    }
 
     #[test]
     fn ids_match_registry() {

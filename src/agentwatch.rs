@@ -222,6 +222,25 @@ impl AgentWatch {
         }
     }
 
+    /// Look again when the answer is older than `max` (the new-session
+    /// picker: what's installed as of now, an agent or integration put on a
+    /// minute ago included); the old answer shows meanwhile.
+    pub fn refresh_if_older(&self, host: &str, max: Duration) {
+        let old = self
+            .inner()
+            .hosts
+            .lock()
+            .unwrap()
+            .get(host)
+            .is_some_and(|e| {
+                e.at.and_then(|t| t.elapsed().ok())
+                    .is_none_or(|age| age > max)
+            });
+        if old {
+            self.refresh(host);
+        }
+    }
+
     /// Take the answer on disk now (another process just looked: `aleph
     /// host setup`), or look again when there's none.
     pub fn reload(&self, host: &str) {

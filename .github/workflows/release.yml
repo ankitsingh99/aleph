@@ -1,31 +1,73 @@
-# Release on v* tags: macOS on Apple silicon, as a plain build and a showcase
-# one. This is the self-update contract (`aleph self-update` reads it):
-#   aleph-<target>.tar.gz   the `aleph` binary at the archive root
+# Builds Aleph for macOS on Apple silicon, plain and showcase, on every push
+# to main, and publishes them as a GitHub release:
+#   * a push to main: when Cargo.toml's version has no release yet (or its
+#     release has no files), v<version> is tagged at that commit (moved there,
+#     for a release without files) and released; otherwise the builds are this
+#     run's artifacts only;
+#   * a v* tag pushed, or run by hand with a tag: that tag is (re)released.
+# What a release carries is the self-update contract (`aleph self-update`):
+#   aleph-<target>.tar.gz            the `aleph` binary at the archive root
 #   aleph-showcase-<target>.tar.gz   the same with showcase mode built in
-#   SHA256SUMS                     `<sha256>  <asset>` lines (sha256sum format)
-#   SHA256SUMS.minisig             its minisign signature (when the repo has MINISIGN_SECRET_KEY)
+#   SHA256SUMS                       `<sha256>  <asset>` lines (sha256sum format)
+#   SHA256SUMS.minisig               its signature (when the repo has MINISIGN_SECRET_KEY)
 # plus aleph.rb, the Homebrew formula rendered from SHA256SUMS.
 name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "existing tag to (re)build, e.g. v1.0.0"
+        description: "existing tag to (re)build, e.g. v2.0.1"
         required: true
 
 permissions:
   contents: write
 
+# one release run at a time: a main push and a tag push never both create it
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
-  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.p.outputs.tag }}
+      ref: ${{ steps.p.outputs.ref }}
+      publish: ${{ steps.p.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_TAG:-}" ]; then
+            tag=$INPUT_TAG ref=$INPUT_TAG publish=true
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag=$GITHUB_REF_NAME ref=$GITHUB_REF_NAME publish=true
+          else
+            v=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n 1)
+            tag="v$v" ref=$GITHUB_SHA
+            # a new version, or a release that has no files yet: release it
+            files=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.assets | length' 2>/dev/null || echo none)
+            if [ "$files" = none ] || [ "$files" = 0 ]; then publish=true; else publish=false; fi
+            echo "$tag: release files $files → publish $publish"
+          fi
+          { echo "tag=$tag"; echo "ref=$ref"; echo "publish=$publish"; } >> "$GITHUB_OUTPUT"
+
   build:
     name: build ${{ matrix.target }}
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
@@ -33,51 +75,52 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
     runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: musl tools
-        if: contains(matrix.target, 'musl')
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: version matches the tag
         shell: bash
         run: |
           v=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n 1)
           [ "v$v" = "$TAG" ] || { echo "error: Cargo.toml version $v doesn't match tag $TAG" >&2; exit 1; }
-      - name: build
+      # no build machine's paths in the binaries: the home folder and the
+      # checkout become ~ and aleph (the last match wins, so the checkout last)
+      - name: paths out of the binaries
+        shell: bash
+        run: echo "RUSTFLAGS=--remap-path-prefix=$HOME=~ --remap-path-prefix=$GITHUB_WORKSPACE=aleph" >> "$GITHUB_ENV"
+      - name: release build
         run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: package
+      - name: package it
         shell: bash
         run: |
           set -euo pipefail
           bin=target/${{ matrix.target }}/release/aleph
-          file "$bin" || true
+          # it runs (one line: a pipe into head would end it with SIGPIPE under pipefail)
+          "$bin" version </dev/null
+          tools/showcase-strings.sh "$bin"
+          tools/leak-scan.sh binary "$bin"
           mkdir -p dist
           # no AppleDouble ._ files from macOS tar: the binary is the only entry
           export COPYFILE_DISABLE=1
           tar -C "$(dirname "$bin")" -czf "dist/aleph-${{ matrix.target }}.tar.gz" aleph
-          tar -tzf "dist/aleph-${{ matrix.target }}.tar.gz"
           # 1.x (claude-herdr) self-update looks for this name with this binary
           # at the root: same build, old name; its first run moves things over
           compat=$(mktemp -d); cp "$bin" "$compat/claude-herdr"
           tar -C "$compat" -czf "dist/claude-herdr-${{ matrix.target }}.tar.gz" claude-herdr
-      - name: run it (native targets)
-        if: matrix.target != 'x86_64-apple-darwin'
-        run: target/${{ matrix.target }}/release/aleph help </dev/null | head -n 5
-      - name: no showcase in the plain build
-        run: tools/showcase-strings.sh target/${{ matrix.target }}/release/aleph
-      - name: showcase build
+      - name: release showcase build
         shell: bash
         run: |
           set -euo pipefail
           cargo build --release --locked --target ${{ matrix.target }} --features showcase
+          tools/leak-scan.sh binary target/${{ matrix.target }}/release/aleph
           export COPYFILE_DISABLE=1
           tar -C target/${{ matrix.target }}/release -czf "dist/aleph-showcase-${{ matrix.target }}.tar.gz" aleph
-          tar -tzf "dist/aleph-showcase-${{ matrix.target }}.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
           name: aleph-${{ matrix.target }}
@@ -88,13 +131,17 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: publish ${{ inputs.tag || github.ref_name }}
-    needs: build
+    name: publish ${{ needs.plan.outputs.tag }}
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      REF: ${{ needs.plan.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -116,7 +163,7 @@ jobs:
             echo "no Homebrew formula this time: it needs every target"
           fi
       # one signature covers every archive (they're all in SHA256SUMS); a repo
-      # without the secret publishes unsigned releases, as before
+      # without the secret publishes unsigned releases
       - name: sign SHA256SUMS (minisign, when MINISIGN_SECRET_KEY is set)
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
@@ -139,9 +186,19 @@ jobs:
         run: |
           set -eu
           notes=$(awk -v v="## ${TAG#v}" 'index($0, v) == 1 {f=1; next} /^## /{f=0} f' CHANGELOG.md || true)
-          [ -n "$notes" ] || notes="aleph $TAG"
+          [ -n "$notes" ] || notes="Aleph $TAG"
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # a release from main that never had files: its tag moves to the
+            # commit these files were built from
+            if [ "$GITHUB_REF_TYPE" = branch ] && [ "$REF" = "$GITHUB_SHA" ]; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$REF" -F force=true >/dev/null \
+                || echo "::warning::$TAG stays where it was; these files are from $REF"
+            fi
+            # (an existing release keeps its title and notes; its files are replaced)
             gh release upload "$TAG" dist/* --clobber
+          elif git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git ls-remote --exit-code --tags origin "$TAG" >/dev/null; then
+            gh release create "$TAG" dist/* --title "Aleph ${TAG#v}" --notes "$notes" --verify-tag
           else
-            gh release create "$TAG" dist/* --title "aleph $TAG" --notes "$notes" --verify-tag
+            # a new version from main: tagged at the commit that was built
+            gh release create "$TAG" dist/* --title "Aleph ${TAG#v}" --notes "$notes" --target "$REF"
           fi

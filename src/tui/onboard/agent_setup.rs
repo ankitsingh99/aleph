@@ -264,7 +264,17 @@ fn agent_row(w: &Wiz, p: &probe::HostProbe, x: &crate::agentsetup::Choice) -> Ro
     };
     let (text, col) = match (&x.found, crate::agentsetup::blocked(&w.cfg, p, &x.plan)) {
         (Some(f), _) if f.version.is_empty() => ("installed".to_string(), c::GREEN()),
-        (Some(f), _) => (format!("installed {}", f.version), c::GREEN()),
+        (Some(f), _) => match a.support(&f.version) {
+            agents::Support::Old => (
+                format!(
+                    "installed {} · older than {}: untested, usage not tracked properly · {}",
+                    f.version, a.min_version, a.upgrade
+                ),
+                c::YELLOW(),
+            ),
+            agents::Support::Yes => (format!("installed {} · supported", f.version), c::GREEN()),
+            agents::Support::Unknown => (format!("installed {}", f.version), c::GREEN()),
+        },
         (None, Some(crate::agentsetup::Why::Manual(_))) => {
             ("no install command".to_string(), c::FAINT())
         }
@@ -307,17 +317,25 @@ pub(crate) fn rows(w: &Wiz) -> Vec<Row> {
                     continue;
                 }
                 let mut spans = Vec::new();
+                let mut old = false;
                 for (i, (ag, f)) in inst.iter().enumerate() {
                     if i > 0 {
                         spans.push(Span::styled(" · ", ui::faint()));
                     }
                     spans.push(glyph(ag.id));
                     spans.push(Span::raw(format!(" {}", ag.name)));
-                    if !f.version.is_empty() {
+                    if ag.support(&f.version) == agents::Support::Old {
+                        old = true;
+                        spans.push(Span::styled(
+                            format!(" {} ⚠ older than {}", f.version, ag.min_version),
+                            ui::fg(c::YELLOW()),
+                        ));
+                    } else if !f.version.is_empty() {
                         spans.push(Span::styled(format!(" {}", f.version), ui::faint()));
                     }
                 }
-                let mut r = Row::check(St::Ok, id, h.clone(), String::new());
+                let st = if old { St::Warn } else { St::Ok };
+                let mut r = Row::check(st, id, h.clone(), String::new());
                 r.note = spans;
                 v.push(r.why("The agents found on the machine: its PATH, your shell's PATH and every folder installers use; each one's --version checked. aleph agents shows the same."));
             }
@@ -481,6 +499,20 @@ pub(crate) fn rows(w: &Wiz) -> Vec<Row> {
         ))
         .why("The agents whose sessions get the key: the ones that read OPENROUTER_API_KEY by themselves (OpenCode, Kilo, Pi, OMP, Crush, Hermes, Maki). Others — Claude Code, Codex, Cline, Qwen Code — would need config of their own, so they don't get it unless you add them."),
     );
+    v.push(
+        Row::choice(
+            "openrouter.models",
+            "models",
+            vec![
+                ("all".into(), "all of them".into()),
+                ("free".into(), "free only · $0".into()),
+                ("paid".into(), "paid only".into()),
+            ],
+            w.value("openrouter.models"),
+            w.pending("openrouter.models"),
+        )
+        .why("Which of OpenRouter's models to use. Free only: the $0 ones (the :free variants — rate-limited, and some providers may train on what you send); paid only leaves those out. The new-session form's model picker lists just those, and OpenCode sessions Aleph starts get the same as their own config (provider.openrouter.whitelist / blacklist, passed with the session — your opencode.json isn't touched). Usage counts free requests' tokens and says free."),
+    );
     // integrations
     v.push(Row::head("Sessions survive a herdr restart"));
     let all: Vec<probe::HostProbe> = probed.iter().map(|p| (*p).clone()).collect();
@@ -613,6 +645,21 @@ pub(crate) fn aside(w: &Wiz, _width: u16) -> Option<Aside> {
                 Span::styled("✓ installed ", ui::fg(c::GREEN())),
                 Span::styled(f.version.clone(), ui::bold()),
             ]));
+            match a.support(&f.version) {
+                agents::Support::Yes => lines.push(Line::from(Span::styled(
+                    format!("supported (Aleph is built for {} and up)", a.min_version),
+                    ui::fg(c::GREEN()),
+                ))),
+                agents::Support::Old => {
+                    if let Some(t) = a.old_note(&f.version) {
+                        lines.push(Line::from(Span::styled(
+                            format!("⚠ {t}"),
+                            ui::fg(c::YELLOW()),
+                        )));
+                    }
+                }
+                agents::Support::Unknown => {}
+            }
             lines.push(Line::from(Span::styled(p.tilde(&f.path), ui::faint())));
             lines.push(Line::from(Span::styled(
                 probe::start_of(Some(a)),

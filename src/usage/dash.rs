@@ -19,6 +19,9 @@ pub struct Live {
     pub agent: String,
     /// its latest request's model, effort and folder (`~/…` under the home)
     pub model: String,
+    /// every model it used, in the order it first did (a switch mid-session:
+    /// more than one; the main thread's, not its subagents')
+    pub models: Vec<String>,
     pub effort: String,
     pub project: String,
     pub tokens: u64,
@@ -403,8 +406,9 @@ pub fn live(recs: &[Record], table: &prices::Table, tz: i64) -> HashMap<String, 
         }
         e.last = e.last.max(r.last);
     }
-    // the context at each request, in order (the main thread's)
+    // the context at each request, in order (the main thread's), and its models
     let mut series: HashMap<&str, Vec<(u64, u64)>> = HashMap::new();
+    let mut used: HashMap<&str, Vec<(u64, &str)>> = HashMap::new();
     for r in recs
         .iter()
         .filter(|r| !r.is_turn() && !r.session.is_empty() && !r.sidechain())
@@ -413,6 +417,21 @@ pub fn live(recs: &[Record], table: &prices::Table, tz: i64) -> HashMap<String, 
             r.ts,
             r.input + r.cache_read + r.cache_write_5m + r.cache_write_1h,
         ));
+        if !r.model.is_empty() {
+            used.entry(r.session.as_str())
+                .or_default()
+                .push((r.ts, r.model.as_str()));
+        }
+    }
+    for (s, mut v) in used {
+        if let Some(l) = out.get_mut(s) {
+            v.sort_by_key(|x| x.0);
+            for (_, m) in v {
+                if !l.models.iter().any(|x| x == m) {
+                    l.models.push(m.to_string());
+                }
+            }
+        }
     }
     for (s, mut v) in series {
         if let Some(l) = out.get_mut(s) {
@@ -485,7 +504,7 @@ fn insights(rs: &[store::Row], heat: &[[u64; 24]; 7], total: &Row) -> Vec<(Strin
     if let Some(m) = group(rs, By::Model).first() {
         v.push((
             "most used model".into(),
-            format!("{} · {}", m.key, money(m.cost(), m.estimated())),
+            format!("{} · {}", m.key, row_money(m)),
         ));
     }
     if let Some(p) = group(rs, By::Project).first().filter(|p| !p.key.is_empty()) {
@@ -583,6 +602,15 @@ pub fn money_short(v: f64, estimated: bool) -> String {
         s + "*"
     } else {
         s
+    }
+}
+
+/// A row's cost: `free` when it all ran on free models, else [`money`].
+pub fn row_money(r: &crate::usage::Row) -> String {
+    if r.all_free() {
+        "free".into()
+    } else {
+        money(r.cost(), r.estimated())
     }
 }
 

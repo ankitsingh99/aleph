@@ -191,7 +191,20 @@ const TABLE: &[(&str, Price)] = &[
     ("o3-mini", p(Rates::flat(1.10, 4.40, 0.55))),
     ("o4-mini", p(Rates::flat(1.10, 4.40, 0.275))),
     ("o1", p(Rates::flat(15.0, 60.0, 7.50))),
-    // ---- Google (list prices as last known)
+    // ---- Google (the Gemini API's paid tier, ai.google.dev/gemini-api/docs/pricing, 2026-10;
+    // the 3.8 / 3.6 Flash prices double on 2027-01-01: analytics.prices.<model> then)
+    ("gemini-3.8-flash", p(Rates::flat(0.75, 3.75, 0.075))),
+    ("gemini-3.6-flash", p(Rates::flat(0.75, 3.75, 0.075))),
+    ("gemini-3-flash", p(Rates::flat(0.50, 3.00, 0.05))),
+    ("gemini-3.5-flash-lite", p(Rates::flat(0.30, 2.50, 0.03))),
+    ("gemini-3.1-flash-lite", p(Rates::flat(0.25, 1.50, 0.025))),
+    (
+        "gemini-3.1-pro",
+        Price {
+            long: Some((200_000, Rates::flat(4.0, 18.0, 0.40))),
+            ..p(Rates::flat(2.0, 12.0, 0.20))
+        },
+    ),
     (
         "gemini-3-pro",
         Price {
@@ -329,10 +342,15 @@ pub fn parse_override(v: &str) -> Result<Rates, String> {
     })
 }
 
-/// Prices in effect: the built-in table plus `analytics.prices.*` overrides.
+/// Prices in effect: `analytics.prices.*` overrides, the built-in table, then
+/// OpenRouter's paid models (its model list, when Aleph keeps one).
 #[derive(Clone, Debug, Default)]
 pub struct Table {
     overrides: Vec<(String, Rates)>,
+    /// OpenRouter's, by normalised id (the first of a name wins)
+    catalog: Vec<(String, Rates)>,
+    /// when that list was read (unix s; 0: none)
+    catalog_at: u64,
 }
 
 impl Table {
@@ -344,16 +362,51 @@ impl Table {
                 Err(e) => crate::log::warn("usage", &format!("analytics.prices.{k}: {e}")),
             }
         }
-        Table { overrides }
+        let (catalog_at, cat) = crate::openrouter::price_catalog();
+        Table {
+            overrides,
+            ..Table::default()
+        }
+        .with_catalog(catalog_at, &cat)
+    }
+
+    /// OpenRouter's paid models as the last resort (`openrouter::paid`).
+    pub fn with_catalog(mut self, at: u64, cat: &[crate::openrouter::Priced]) -> Table {
+        self.catalog.clear();
+        for (id, i, o, cr) in cat {
+            let n = normalize(id);
+            if !self.catalog.iter().any(|(k, _)| *k == n) {
+                // no cached-read price said: cached input at the input price
+                self.catalog
+                    .push((n, Rates::flat(*i, *o, cr.unwrap_or(*i))));
+            }
+        }
+        self.catalog_at = at;
+        self
     }
 
     /// A model's prices (None: unknown, so no estimate).
     pub fn get(&self, model: &str) -> Option<Price> {
         let n = normalize(model);
+        self.exact(&n).or_else(|| {
+            // a variant's short tag (Antigravity's `gemini-3.8-flash-n`): the model it tags
+            let (base, tag) = n.rsplit_once('-')?;
+            (!tag.is_empty() && tag.len() <= 2 && tag.chars().all(|c| c.is_ascii_alphabetic()))
+                .then(|| self.exact(base))
+                .flatten()
+        })
+    }
+
+    fn exact(&self, n: &str) -> Option<Price> {
         if let Some((_, r)) = self.overrides.iter().find(|(k, _)| *k == n) {
             return Some(p(*r));
         }
-        builtin(&n)
+        builtin(n).or_else(|| {
+            self.catalog
+                .iter()
+                .find(|(k, _)| *k == n)
+                .map(|(_, r)| p(*r))
+        })
     }
 
     /// A fingerprint of everything that changes estimates (stale rollups are rebuilt).
@@ -364,6 +417,10 @@ impl Table {
                 "|{k}={},{},{},{},{}",
                 r.input, r.output, r.cache_write_5m, r.cache_write_1h, r.cache_read
             ));
+        }
+        // OpenRouter's list, read at most daily: estimates move with it
+        if !self.catalog.is_empty() {
+            s.push_str(&format!("|or@{}", self.catalog_at / 86_400));
         }
         s
     }
@@ -437,6 +494,54 @@ pub fn cost(pr: &Price, t: &Tokens, fast: bool, us: bool) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn openrouter_prices_what_nothing_else_does() {
+        let v: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/openrouter/models.json")).unwrap();
+        let cat = crate::openrouter::paid(crate::openrouter::parse_models(&v));
+        let t = Table::default().with_catalog(1_792_000_000, &cat);
+        // not in the built-in table: OpenRouter's price
+        let glm = t.get("z-ai/glm-4.6").unwrap();
+        assert_eq!(
+            (glm.base.input, glm.base.output, glm.base.cache_read),
+            (0.6, 2.2, 0.6)
+        );
+        // the paid one, never its free variant's zero
+        assert_eq!(t.get("qwen/qwen3-coder").unwrap().base.input, 0.22);
+        // the built-in table first
+        assert_eq!(
+            t.get("anthropic/claude-sonnet-4.5").unwrap().base.input,
+            Table::default()
+                .get("claude-sonnet-4-5")
+                .unwrap()
+                .base
+                .input
+        );
+        assert!(t.get("openrouter/auto").is_none());
+        assert_ne!(
+            t.stamp(),
+            Table::default().stamp(),
+            "estimates follow the list"
+        );
+    }
+
+    #[test]
+    fn gemini_3_and_antigravitys_variant_tags() {
+        let t = Table::default();
+        let flash = t.get("gemini-3.8-flash").unwrap();
+        assert_eq!(
+            (flash.base.input, flash.base.output, flash.base.cache_read),
+            (0.75, 3.75, 0.075)
+        );
+        // Antigravity names it with a short tag
+        assert_eq!(t.get("gemini-3.8-flash-n").unwrap().base.input, 0.75);
+        assert!(t.get("gemini-3.1-pro-preview").unwrap().long.is_some());
+        assert_eq!(t.get("gemini-3-flash-preview").unwrap().base.output, 3.0);
+        // a long tag is another model, not a variant
+        assert!(t.get("gemini-3.8-flash-thinking").is_none());
+        assert!(t.get("gemini-3.8-flash-1").is_none());
+    }
 
     #[test]
     fn model_ids_normalize() {

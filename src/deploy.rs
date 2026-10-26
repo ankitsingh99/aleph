@@ -363,9 +363,12 @@ pub fn source_dir(flag: Option<&str>) -> Result<PathBuf, String> {
             return Ok(p);
         }
     }
-    let m = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if ours(&m) {
-        return Ok(m);
+    // a build from your own checkout (install.sh) remembers where it is; a
+    // release names no folder of the computer that built it
+    if let Some(m) = option_env!("ALEPH_SRC").map(PathBuf::from) {
+        if ours(&m) {
+            return Ok(m);
+        }
     }
     Err("no checkout of aleph to build from — run it from yours, or pass --src DIR".into())
 }

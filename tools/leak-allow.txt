@@ -1,0 +1,61 @@
+# tools/leak-scan.sh: text that looks private by its shape but isn't — made-up
+# homes, people and addresses in tests and docs, and published test values.
+# Each line is cut out of a line before it's judged (a real value beside one
+# still shows). Exact text, case and all; # comments.
+
+# made-up homes (tests, docs, the demo world)
+/home/selene
+/home/tester
+/home/ford
+/home/naomi
+/home/dev
+/home/me
+/home/u/
+/Users/me
+/home/linuxbrew
+
+# made-up and documentation addresses
+tester@gpu2.lan
+me@box3.lan
+me@work.com
+you@work.com
+me@home.dev
+ME@HOME.DEV
+me@chatgpt.dev
+me@example.com
+alex@example.com
+push@example.com
+smoke@example.com
+aleph@example.com
+u@work.example
+u@home.example
+u@gmail.example
+name@host.tld
+git@github.com
+git@GitHub.com
+git@git.corp.example
+user@fcm.googleapis.com
+sk-ssh-ed25519@openssh.com
+aleph@users.noreply.github.com
+noreply@anthropic.com
+
+# fake keys in tests (masking and redaction), and published examples
+sk-or-v1-feedfacefeedfacefeedfacefeedfacefeedfacefeedfacefeedface00
+sk-or-v1-0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+sk-or-v1-0ddba11c0ffee0ddba11c0ffee0ddba11c0ffee0ddba11c0ffee00aa
+sk-or-v1-c0ffee00settings0000000000000000000000000000000000000000beef
+sk-or-v1-5m0ke5m0ke00fa4e00000000000000000000000000000000000000000000c0de
+sk-ant-api03-AbCdEf1234567890abcdefXYZ
+sk-ant-oat01-canary
+sk-ant-ort01-canary
+ghp_aaaaBBBBccccDDDDeeeeFFFF0000
+ghp_abcdefghijklmnopqrstuvwxyz0123456789
+ghp_TOKEN@github.com
+SECRET-ghp@github.com
+AKIAIOSFODNN7EXAMPLE
+# the masking code's own list of token prefixes (sentlog::scrub)
+xoxb-xoxp-xoxa-xapp-glpat-hf_pypi-
+eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcDEF123ghi
+-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk
+"-----BEGIN OPENSSH PRIVATE KEY-----\nx\n"
+"-----BEGIN RSA PRIVATE KEY-----\nx\n"

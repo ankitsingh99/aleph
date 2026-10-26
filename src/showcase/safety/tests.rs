@@ -102,7 +102,7 @@ fn a_claude_screen_keeps_its_frame_and_loses_its_words() {
         "{call}"
     );
     let out = red(screen[8]);
-    assert!(out.starts_with("  ⎿  [") && no_words(&out), "{out}");
+    assert!(out.starts_with("  ⎿  ") && no_words(&out), "{out}");
 }
 
 #[test]

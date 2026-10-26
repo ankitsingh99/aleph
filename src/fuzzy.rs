@@ -126,7 +126,7 @@ const P_DEPTH: i32 = 3;
 /// Score a relative path (`a/b/name`) from the deep index. Without a `/` in
 /// the query the last component is matched (like a plain name, positions
 /// shifted into the full path); failing that, the whole path is tried at a
-/// penalty, so `pxsrc` still finds `px_color/src`. A query with `/` always
+/// penalty, so `oxsrc` still finds `ox_color/src`. A query with `/` always
 /// matches the whole path. Matches that start a component earn a bonus;
 /// deeper paths lose a little.
 pub fn score_path(query: &str, rel: &str) -> Option<(i32, Vec<usize>)> {
@@ -199,7 +199,7 @@ mod tests {
             &["proj/src", "ox_color_check/src"]
         );
         assert_eq!(
-            rank_paths("trtp", DEEP)[0],
+            rank_paths("zapp", DEEP)[0],
             "ox_color_check/tools/zap_probe"
         );
         assert_eq!(rank_paths("mod", DEEP)[0], "work/models");
@@ -207,9 +207,9 @@ mod tests {
         let (_, pos) = score_path("bin", "proj/src/bin").unwrap();
         assert_eq!(pos, vec![9, 10, 11]);
         // no last-component match: whole path at a penalty, boundaries count
-        let (_, pos) = score_path("pxsrc", "ox_color_check/src").unwrap();
+        let (_, pos) = score_path("oxsrc", "ox_color_check/src").unwrap();
         assert_eq!(&pos[2..], &[15, 16, 17]);
-        assert_eq!(rank_paths("pxsrc", DEEP)[0], "ox_color_check/src");
+        assert_eq!(rank_paths("oxsrc", DEEP)[0], "ox_color_check/src");
         // a query with '/' matches across components without the penalty
         assert_eq!(rank_paths("bl/d", DEEP)[0], "work/blaze/docs");
         assert!(score_path("zzz", "proj/src").is_none());
@@ -265,19 +265,19 @@ mod tests {
 
     #[test]
     fn word_starts_beat_scattered() {
-        assert_eq!(rank("pxc", DIRS)[0], "ox_color_check");
-        assert_eq!(rank("pca", DIRS)[0], "ox_color_check");
-        assert_eq!(rank("trtp", DIRS)[0], "zap_probe");
+        assert_eq!(rank("oxc", DIRS)[0], "ox_color_check");
+        assert_eq!(rank("occ", DIRS)[0], "ox_color_check");
+        assert_eq!(rank("zapp", DIRS)[0], "zap_probe");
         assert_eq!(rank("mix", DIRS)[0], "AuroraMix_3.1");
         assert_eq!(rank("blaze", DIRS)[0], "blaze");
-        assert_eq!(rank("cuda", DIRS)[0], "moss-env-check");
+        assert_eq!(rank("moss", DIRS)[0], "moss-env-check");
     }
 
     #[test]
     fn smart_case_and_positions() {
-        assert!(score("PX", "ox_meadow").is_none()); // uppercase query is case-sensitive
-        assert!(score("px", "AuroraMix_3.1").is_some());
-        let (_, pos) = score("pxc", "ox_color_check").unwrap();
+        assert!(score("OX", "ox_meadow").is_none()); // uppercase query is case-sensitive
+        assert!(score("ax", "AuroraMix_3.1").is_some());
+        let (_, pos) = score("oxc", "ox_color_check").unwrap();
         assert_eq!(pos, vec![0, 1, 3]);
         let (_, pos) = score("mix", "AuroraMix_3.1").unwrap();
         assert_eq!(pos, vec![6, 7, 8]);

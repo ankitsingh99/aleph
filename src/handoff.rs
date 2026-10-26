@@ -346,7 +346,7 @@ mod tests {
         };
         // a diff stat's histogram has dashes of its own
         let git = "branch: feat/lut\n M src/a.rs\n@@aleph@@\n src/a.rs | 12 +++---\n 1 file changed\n@@aleph@@\nabc123 fit the LUT\n";
-        let n = aleph_note(&s, git, "line\n\n⏺ FP16 is 2.3× faster\n");
+        let n = aleph_note(&s, git, "line\n\n⏺ SIMD is 2.3× faster\n");
         assert!(
             n.contains("Task: Profile the layout engine") && n.contains("branch: feat/lut"),
             "{n}"
@@ -356,7 +356,7 @@ mod tests {
             "{n}"
         );
         assert!(
-            n.contains("## Recent commits\nabc123") && n.contains("FP16 is 2.3× faster"),
+            n.contains("## Recent commits\nabc123") && n.contains("SIMD is 2.3× faster"),
             "{n}"
         );
         // no git: no empty sections

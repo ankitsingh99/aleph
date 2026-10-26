@@ -559,6 +559,9 @@ pub struct Row {
     pub guess: bool,
     /// the agent's turn records in it: prompts it finished
     pub prompts: u64,
+    /// requests the provider charged nothing for (`Record::free`): counted in
+    /// tokens and requests, their cost a known $0
+    pub free: u64,
     /// its folder's project (`projects::Index`, filled when queried; not kept)
     pub pid: String,
 }
@@ -591,7 +594,8 @@ impl Row {
             self.acct,
             self.guess,
             self.hour,
-            self.prompts
+            self.prompts,
+            self.free
         ])
     }
     fn from_json(v: &Value) -> Option<Row> {
@@ -629,6 +633,7 @@ impl Row {
             guess: a.get(23).and_then(Value::as_bool).unwrap_or(false),
             hour: a.get(24).and_then(Value::as_u64).unwrap_or(0) as u8,
             prompts: a.get(25).and_then(Value::as_u64).unwrap_or(0),
+            free: a.get(26).and_then(Value::as_u64).unwrap_or(0),
             pid: String::new(),
         })
     }
@@ -887,6 +892,11 @@ pub fn build_all(
                 row.cost_reported += c;
                 (c, false)
             }
+            // free: a known $0 (counted as reported, never priced as the paid model)
+            None if r.free() => {
+                row.free += 1;
+                (0.0, false)
+            }
             None => {
                 let pr = *cache
                     .entry(r.model.clone())
@@ -1094,9 +1104,19 @@ fn summed(months: &[String], table: &prices::Table) -> Vec<MonthRollup> {
 
 // ------------------------------------------------------------------ re-reads
 
-/// The readers' generation: a reader that learned to read more (the
-/// timeline's steps) reads every log again once, from the start.
-pub const GEN: u64 = 2;
+/// The readers' generation: a reader that learned to read more reads its
+/// logs again once, from the start. 2: the timeline's steps (every log);
+/// 3: Codex 0.164's helper threads (its logs of the last week).
+pub const GEN: u64 = 3;
+
+/// What a host at generation `g` forgets of `files` to read them again.
+pub fn regen(g: u64, files: &mut BTreeMap<String, FileState>, now: u64) {
+    if g < 2 {
+        files.clear();
+    } else if g < 3 {
+        files.retain(|_, f| f.agent != "codex" || f.mtime + 7 * 86_400 < now);
+    }
+}
 
 /// Each machine's generation, and whether its re-read is still catching up
 /// (`gens.json`: an older build never touches it).
@@ -1449,6 +1469,7 @@ mod tests {
             guess: true,
             hour: 14,
             prompts: 3,
+            free: 2,
             pid: String::new(),
         };
         assert_eq!(Row::from_json(&r.to_json()), Some(r.clone()));

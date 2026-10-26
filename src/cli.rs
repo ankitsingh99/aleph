@@ -159,7 +159,25 @@ fn host_line(h: &crate::fleet::Host) -> Line<'static> {
         }
         Conn::Unknown => v.push(Span::styled("  …", ui::faint())),
     }
+    if h.paused {
+        v.push(Span::styled("  ⏸ paused", ui::fg(c::YELLOW())));
+    }
     Line::from(v)
+}
+
+/// A paused machine isn't watched: say so, and how to resume it.
+pub fn warn_paused(f: &Fleet) {
+    for h in f.paused() {
+        warn(&format!(
+            "{} is paused: the dashboard and the daemon don't watch it (no states, questions or alerts from it)",
+            h.alias
+        ));
+        hint(&format!(
+            "Z on it in Fleet resumes it · or {} settings unset host.{}.paused",
+            crate::doctor::me(),
+            h.alias
+        ));
+    }
 }
 
 pub fn session_lines(f: &Fleet) -> Vec<Line<'static>> {
@@ -286,6 +304,9 @@ pub fn ls(a: Args) -> ExitCode {
         std::thread::sleep(Duration::from_secs(a.cfg.refresh()));
         f.poll_blocking(Duration::from_secs(20));
     }
+    if !watch {
+        warn_paused(&f);
+    }
     if !plain && !watch {
         hint("aleph ls in a terminal opens the dashboard · aleph resume <name> attaches");
     }
@@ -303,8 +324,10 @@ fn counts(f: &Fleet) -> serde_json::Value {
         "idle": n("idle"),
         "hosts": f.hosts.iter().map(|h| json!({
             "alias": h.alias, "reachable": h.conn == Conn::Up, "sessions": h.sessions.len(),
-            "blocked": h.count("blocked"), "working": h.count("working"),
+            "blocked": h.count("blocked"), "working": h.count("working"), "paused": h.paused,
         })).collect::<Vec<_>>(),
+        // not watched (no states, questions or alerts from them)
+        "paused": f.paused().iter().map(|h| h.alias.clone()).collect::<Vec<_>>(),
         "needs_you": all.iter().filter(|s| s.blocked()).map(|s| json!({"host": s.host, "name": s.name, "display": s.display(), "title": s.title})).collect::<Vec<_>>(),
         "generated_at": crate::cache::now(),
     })
@@ -383,6 +406,10 @@ pub fn status(a: Args) -> ExitCode {
                         ui::faint(),
                     ),
                 ]));
+            }
+            for h in v["paused"].as_array().cloned().unwrap_or_default() {
+                let h = h.as_str().unwrap_or("");
+                warn(&format!("{h} is paused: not watched (Z on it in Fleet resumes it · {} settings unset host.{h}.paused)", crate::doctor::me()));
             }
         }
         if !watch {

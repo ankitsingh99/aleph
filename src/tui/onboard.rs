@@ -451,6 +451,9 @@ pub struct Wiz {
     pub(crate) mode: Overlay,
     /// quick start is waiting for what it reads (`quick::tick`)
     pub(crate) quick: bool,
+    /// just the install screen, for actions handed in (`run_actions_in`):
+    /// no wizard behind it, esc goes back once it's done
+    pub(crate) queue_only: bool,
     tx: Sender<(u64, Msg)>,
     rx: Receiver<(u64, Msg)>,
     pub t0: Instant,
@@ -550,6 +553,7 @@ impl Wiz {
             cell: 0,
             mode: Overlay::None,
             quick: false,
+            queue_only: false,
             tx,
             rx,
             t0: Instant::now(),
@@ -2486,6 +2490,38 @@ pub(crate) fn run_step_in(tui: &mut Tui, cfg: Config, step: Step) -> Result<(), 
                 w.save();
                 return Ok(());
             }
+            Ok(Exit::Hand(h)) => {
+                let r = run_hand(tui, &h);
+                w.after(&h, r);
+            }
+            Err(e) => return Err(format!("terminal: {e}")),
+        }
+    }
+}
+
+/// Apply `want` on setup's install screen, on the dashboard's own terminal
+/// (an agent installed from the new-session form, a doctor fix): live
+/// output, retry and the log as in setup, no wizard around it, and none of
+/// it saved as setup's answers. Enter (or esc) at the end goes back.
+pub(crate) fn run_actions_in(
+    tui: &mut Tui,
+    cfg: Config,
+    want: Vec<(Step, Action)>,
+) -> Result<(), String> {
+    let opts = Opts {
+        redo: true,
+        only: Some(Step::Review),
+        ..Default::default()
+    };
+    let mut w = Wiz::new(cfg, opts, state_file(), false);
+    w.queue_only = true;
+    for (s, a) in want {
+        w.plan.want(s, a, true);
+    }
+    review::start(&mut w);
+    loop {
+        match w.run(tui) {
+            Ok(Exit::Quit) | Ok(Exit::Dashboard { .. }) => return Ok(()),
             Ok(Exit::Hand(h)) => {
                 let r = run_hand(tui, &h);
                 w.after(&h, r);

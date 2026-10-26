@@ -733,6 +733,39 @@ impl Fleet {
         });
     }
 
+    /// Follow the settings' `host.<a>.paused` (a dashboard paused a machine,
+    /// or `aleph settings` resumed it): a machine resumed is polled now.
+    /// Whether anything changed.
+    pub fn follow_paused(&mut self, cfg: &Config) -> bool {
+        let mut resumed = Vec::new();
+        let mut moved = false;
+        for h in self.hosts.iter_mut() {
+            let p = cfg
+                .host_get(&h.alias, "paused")
+                .is_some_and(|v| v == "true");
+            if p != h.paused {
+                h.paused = p;
+                moved = true;
+                if !p {
+                    resumed.push(h.alias.clone());
+                }
+            }
+        }
+        for a in resumed {
+            crate::log::info("fleet", &format!("{a} resumed (the settings say so)"));
+            self.poll(&a);
+        }
+        if moved {
+            self.changed_at = Instant::now();
+        }
+        moved
+    }
+
+    /// The machines that are paused (not polled: what they show is as last seen).
+    pub fn paused(&self) -> Vec<&Host> {
+        self.hosts.iter().filter(|h| h.paused).collect()
+    }
+
     pub fn remove_host(&mut self, alias: &str) {
         self.hosts.retain(|h| h.alias != alias);
     }
@@ -898,6 +931,9 @@ impl Fleet {
             // sessions that lost their hue/mark one again (once per run)
             if let Ok(v) = res.as_mut() {
                 retoken(&h, &ssh, v);
+                // a conversation herdr didn't name (Codex's hooks run in its
+                // daemon, away from the pane): the store's newest there
+                crate::usage::recent::fill(&ssh, v);
             }
             let took = t0.elapsed();
             // the machine answered (even if its herdr server is down): check the version
@@ -1351,7 +1387,9 @@ impl Fleet {
                 // not polled yet this run: what the last run saw stands (marked stale)
                 "reachable": h.conn == Conn::Up || (h.conn == Conn::Unknown && h.stale),
                 "error": match &h.conn { Conn::Down(e) => Some(e.clone()), _ => None },
-                "stale": h.stale,
+                // a paused machine isn't polled: what it shows is as last seen
+                "stale": h.stale || h.paused,
+                "paused": h.paused,
                 "fetched_at": h.fetched,
                 "latency_ms": h.latency.map(|d| d.as_millis() as u64),
                 "herdr_version": h.herdr_version,

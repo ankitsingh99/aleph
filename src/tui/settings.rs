@@ -195,8 +195,12 @@ fn described(help: &str, opts: &[&str]) -> Vec<(String, String)> {
 /// all or none are ticked).
 fn list_words(key: &str) -> (&'static str, &'static str) {
     match key {
+        // (showcase's own settings: only in a build that has it)
+        #[cfg(feature = "showcase")]
         "showcase.machines" | "showcase.users" | "showcase.things" => ("any", "any"),
+        #[cfg(feature = "showcase")]
         "showcase.universes" => ("all", "all"),
+        #[cfg(feature = "showcase")]
         "showcase.watermark_on" => ("", "off"),
         _ => ("all", "off"),
     }
@@ -2284,43 +2288,47 @@ mod tests {
             list_value("ui.splash_fx", &o(&fx), &[true, false, true]),
             "tunnel,glow"
         );
-        // name kinds: every kind is "any"; your own words alone are "mine"
-        let kinds = o(&["ais", "people", "ships", "places", "things", "mine"]);
-        assert_eq!(ticked("any", &["ais", "mine"]), vec![true, false]);
-        assert_eq!(
-            list_value(
-                "showcase.machines",
-                &kinds,
-                &[true, true, true, true, true, false]
-            ),
-            "any"
-        );
-        assert_eq!(
-            list_value(
-                "showcase.machines",
-                &kinds,
-                &[false, false, false, false, false, true]
-            ),
-            "mine"
-        );
-        assert_eq!(
-            list_value(
-                "showcase.machines",
-                &kinds,
-                &[false, false, true, false, false, true]
-            ),
-            "ships,mine"
-        );
-        // the watermark's places: none is off, all of them listed
-        let at = o(&["tui", "raycast", "web"]);
-        assert_eq!(
-            list_value("showcase.watermark_on", &at, &[true, true, true]),
-            "tui,raycast,web"
-        );
-        assert_eq!(
-            list_value("showcase.watermark_on", &at, &[false, false, false]),
-            "off"
-        );
+        // showcase's own lists, only in a build that has it
+        #[cfg(feature = "showcase")]
+        {
+            // name kinds: every kind is "any"; your own words alone are "mine"
+            let kinds = o(&["ais", "people", "ships", "places", "things", "mine"]);
+            assert_eq!(ticked("any", &["ais", "mine"]), vec![true, false]);
+            assert_eq!(
+                list_value(
+                    "showcase.machines",
+                    &kinds,
+                    &[true, true, true, true, true, false]
+                ),
+                "any"
+            );
+            assert_eq!(
+                list_value(
+                    "showcase.machines",
+                    &kinds,
+                    &[false, false, false, false, false, true]
+                ),
+                "mine"
+            );
+            assert_eq!(
+                list_value(
+                    "showcase.machines",
+                    &kinds,
+                    &[false, false, true, false, false, true]
+                ),
+                "ships,mine"
+            );
+            // the watermark's places: none is off, all of them listed
+            let at = o(&["tui", "raycast", "web"]);
+            assert_eq!(
+                list_value("showcase.watermark_on", &at, &[true, true, true]),
+                "tui,raycast,web"
+            );
+            assert_eq!(
+                list_value("showcase.watermark_on", &at, &[false, false, false]),
+                "off"
+            );
+        }
     }
 
     #[test]

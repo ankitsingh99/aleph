@@ -1359,11 +1359,23 @@ impl Herdr {
         // `layout.apply` request over herdr's socket, never on a command line
         let cfg = crate::config::Config::load();
         let mine = crate::openrouter::wants(&cfg, kind);
+        // OpenCode with OpenRouter: only the free (or only the paid) models, as
+        // config of its own for that session (`openrouter.models`; not a secret)
+        let oc = (mine && kind == "opencode" && crate::openrouter::configured(&cfg))
+            .then(|| crate::openrouter::opencode_config(&cfg))
+            .flatten();
         let mut k = 0;
         let shape = shape.map(&mut |l| {
             k += 1;
+            let mut env = l.env.clone();
+            if let (true, Some(c)) = (mine && k <= n, &oc) {
+                if !env.iter().any(|(k, _)| k == "OPENCODE_CONFIG_CONTENT") {
+                    env.push(("OPENCODE_CONFIG_CONTENT".into(), c.clone()));
+                }
+            }
             Leaf {
                 openrouter: l.openrouter || (mine && k <= n),
+                env,
                 ..l.clone()
             }
         });

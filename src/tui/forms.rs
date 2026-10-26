@@ -745,6 +745,8 @@ pub(crate) struct NewForm {
     msel: usize,
     /// OpenRouter's models, read once off the UI thread (a day's cache)
     models: crate::openrouter::ModelList,
+    /// which of them it offers (`openrouter.models`: all, free, paid)
+    or_models: String,
     /// what's typed on the agent field to find one
     aq: Field,
 }
@@ -769,7 +771,9 @@ impl NewForm {
         let hosts: Vec<String> = d.fleet.hosts.iter().map(|h| h.alias.clone()).collect();
         let def = crate::agents::default_agent_for(&d.cfg, host).id;
         let watch = AgentWatch::current().unwrap_or_else(|| AgentWatch::standalone(&[]));
-        NewForm::with(hosts, host, dir, def, watch)
+        let mut nf = NewForm::with(hosts, host, dir, def, watch);
+        nf.or_models = d.cfg.get_or("openrouter.models");
+        nf
     }
     fn with(
         hosts: Vec<String>,
@@ -800,6 +804,7 @@ impl NewForm {
             model: Field::default(),
             msel: 0,
             models: crate::openrouter::ModelList::default(),
+            or_models: "all".into(),
             aq: Field::default(),
         };
         nf.load_recent();
@@ -834,15 +839,24 @@ impl NewForm {
             }
         }
     }
-    /// The models matching what's typed, best first (at most `n`).
+    /// The models matching what's typed, best first (at most `n`), of the
+    /// ones `openrouter.models` lets through.
     fn model_matches(&self, n: usize) -> Vec<crate::openrouter::Model> {
         match self.models.get() {
             Some(Ok(v)) => crate::openrouter::search(&v, &self.model.text)
                 .into_iter()
+                .filter(|m| self.or_ok(m))
                 .take(n)
                 .cloned()
                 .collect(),
             _ => vec![],
+        }
+    }
+    fn or_ok(&self, m: &crate::openrouter::Model) -> bool {
+        match self.or_models.as_str() {
+            "free" => crate::openrouter::is_free(m),
+            "paid" => !crate::openrouter::is_free(m),
+            _ => true,
         }
     }
     /// Take the highlighted model into the field.
@@ -1392,7 +1406,8 @@ impl NewForm {
                 ),
             ])),
             Some(Ok(all)) => {
-                let found = crate::openrouter::search(&all, &self.model.text);
+                let mut found = crate::openrouter::search(&all, &self.model.text);
+                found.retain(|m| self.or_ok(m));
                 if found.is_empty() {
                     v.push(Line::from(vec![
                         Span::raw(pad),

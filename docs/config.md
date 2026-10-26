@@ -106,6 +106,7 @@ dashboard's Settings tab edits them. Per-machine settings are `host.<alias>.<key
 | `race.agents` | `race.agents` | `claude,codex` | the agents a race runs, 2 to 4, a comma list (aleph race --agents overrides it); each gets the same prompt in a git worktree of its own |
 | `openrouter.key` | `openrouter.key` | `secret:openrouter` | your OpenRouter API key, kept in the Keychain / Secret Service (aleph secret set openrouter, or setup's Agents step); off = none. Sessions of openrouter.agents get it as OPENROUTER_API_KEY (only through herdr's socket: never on a command line, on disk or in a log), and Usage shows its spend |
 | `openrouter.agents` | `openrouter.agents` | `opencode,kilo,pi,omp,crush,hermes,maki` | the agents whose sessions get the OpenRouter key: agent ids (the ones that read OPENROUTER_API_KEY themselves), all (-id leaves one out), or off. OpenCode, Kilo, Pi and OMP also get a model picker in the new-session form |
+| `openrouter.models` | `openrouter.models` | `all` (all \| free \| paid) | which of OpenRouter's models to use: all, only the free ones ($0, the :free variants), or only paid ones. The new-session form's model picker lists just those, and OpenCode sessions Aleph starts get the same as their own config (OPENCODE_CONFIG_CONTENT: provider.openrouter.whitelist / blacklist; your opencode.json is never touched) |
 
 ## Notifications
 

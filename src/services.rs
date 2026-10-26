@@ -3298,10 +3298,25 @@ fn talk(
     timed_out: &mut bool,
 ) -> Result<(Remote, Vec<Found>), String> {
     let left = || end.saturating_duration_since(Instant::now());
-    stdin
+    // ssh's last words (its stderr), once the reader has caught them
+    let last_words = |fallback: String| {
+        thread::sleep(Duration::from_millis(100));
+        errbuf
+            .lock()
+            .unwrap()
+            .lines()
+            .map(str::trim)
+            .rfind(|l| !l.is_empty() && !l.starts_with("Warning: Permanently added"))
+            .map(str::to_string)
+            .unwrap_or(fallback)
+    };
+    // a link that's already gone breaks the pipe: say why it's gone
+    if let Err(e) = stdin
         .write_all(script().as_bytes())
         .and_then(|_| stdin.flush())
-        .map_err(|e| format!("couldn't send the probe: {e}"))?;
+    {
+        return Err(last_words(format!("couldn't send the probe: {e}")));
+    }
     let mut first = String::new();
     loop {
         match rx.recv_timeout(left()) {
@@ -3312,16 +3327,7 @@ fn talk(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => return Err("timed out".into()),
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                // let the stderr reader catch ssh's last words
-                thread::sleep(Duration::from_millis(100));
-                return Err(errbuf
-                    .lock()
-                    .unwrap()
-                    .lines()
-                    .map(str::trim)
-                    .rfind(|l| !l.is_empty() && !l.starts_with("Warning: Permanently added"))
-                    .map(str::to_string)
-                    .unwrap_or_else(|| "the probe ended early".into()));
+                return Err(last_words("the probe ended early".into()));
             }
         }
     }

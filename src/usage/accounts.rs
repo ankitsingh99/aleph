@@ -8,7 +8,8 @@
 //! |---|---|
 //! | Claude Code | its config folder's `.claude.json` `oauthAccount` (id, email, organisation, plan), read beside the logs (`N` lines); none there: an API key, per folder |
 //! | Codex | each session's own `creator_account_id` (exact, per request), its plan from the log's rate limits, its email from the app server (`account/read`) |
-//! | Gemini CLI | `google_accounts.json`'s `active` email |
+//! | Gemini CLI | how `settings.json` says it signs in: a Google sign-in, `google_accounts.json`'s `active` email; an API key or Vertex AI, the key's own account per machine (the key never read) |
+//! | Antigravity CLI | its Google sign-in: `google_accounts.json`'s `active` email (shared with Gemini CLI) |
 //! | OpenCode, pi | the provider each request went through, per machine |
 //! | the rest | one per machine |
 //!
@@ -443,6 +444,19 @@ pub fn stamp(b: &mut Book, host: &str, out: &mut Output, now: u64) {
                 parse::hash(&["claude", "api", host, &n.root]),
                 Account {
                     kind: "api".into(),
+                    ..Default::default()
+                },
+            ),
+            // Gemini CLI on an API key or Vertex AI: the key's own account, per machine
+            ("gemini", true) if n.email.is_empty() && !n.billing.is_empty() => (
+                parse::hash(&["gemini", "api", host, &n.billing]),
+                Account {
+                    kind: "api".into(),
+                    plan: if n.billing.contains("vertex") {
+                        "Vertex AI".into()
+                    } else {
+                        String::new()
+                    },
                     ..Default::default()
                 },
             ),

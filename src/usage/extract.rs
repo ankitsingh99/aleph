@@ -34,7 +34,9 @@ use super::parse;
 use std::collections::HashMap;
 
 /// Agents with a reader, in the order they're listed.
-pub const READERS: &[&str] = &["claude", "codex", "pi", "omp", "opencode", "gemini", "qwen"];
+pub const READERS: &[&str] = &[
+    "claude", "codex", "pi", "omp", "opencode", "gemini", "agy", "qwen",
+];
 
 /// The reader awk program (one per log line or file; see `READ_AWK` users in
 /// the script). Single quotes are not allowed in here: it is embedded in
@@ -51,7 +53,7 @@ BEGIN {
   HOME = ENVIRON["HOME"]; FP = ENVIRON["FP"]; SZ = ENVIRON["SZ"]; CTX = ENVIRON["CTX"]
   US = sprintf("%c", 31)
   if (CTX == "-") CTX = ""
-  JL = (K == "claude" || K == "codex" || K == "pi" || K == "qwen" || K == "geminil")
+  JL = (K == "claude" || K == "codex" || K == "pi" || K == "qwen" || K == "geminil" || K == "agyt")
   # Gemini keeps chats under tmp/<project>/chats/: the project, unless it is a hash
   i = index(FP, "/chats/"); PROJ = (i > 0) ? substr(FP, 1, i - 1) : ""; sub(/.*\//, "", PROJ)
   if (PROJ ~ /^[0-9a-f]+$/ && length(PROJ) >= 32) PROJ = ""
@@ -102,6 +104,7 @@ function setup(   n, c) {
     w("type timestamp payload.type payload.id payload.cwd payload.model payload.effort payload.response_id payload.turn_id payload.duration_ms")
     w("payload.name payload.namespace payload.call_id payload.status payload.item.type payload.item.id payload.item.status payload.item.exit_code payload.started_at_ms payload.completed_at_ms payload.reason")
     w("payload.source.subagent.thread_spawn.parent_thread_id payload.source.subagent.thread_spawn.agent_role")
+    w("payload.parent_thread_id payload.source.subagent.other payload.thread_source")
     tu("payload.usage."); tu("payload.info.last_token_usage.")
     w("payload.info.total_token_usage.total_tokens payload.rate_limits.limit_id payload.rate_limits.plan_type payload.creator_account_id")
     rl("payload.rate_limits.primary."); rl("payload.rate_limits.secondary.")
@@ -127,6 +130,12 @@ function setup(   n, c) {
     cS = c[1]; cF = c[2]
     FID = FP; sub(/.*\//, "", FID); sub(/\.jsonl$/, "", FID)
     if (FID ~ /^session-/) FID = substr(FID, length(FID) - 7)
+  } else if (K == "agyt") {
+    # numbers, times, kinds and tool names: never content, thinking or the arguments of a call
+    w("type step_index source status created_at input_tokens output_tokens cache_read_tokens tool_calls.#.name")
+    AGP = c[1]; AGPI = c[2]; AGG = c[3]; AGW = c[4]; AGLM = c[5]
+    # brain/<conversation>/.system_generated/logs/transcript.jsonl
+    AGS = FP; sub(/\/\.system_generated\/.*$/, "", AGS); sub(/.*\//, "", AGS)
   } else if (K == "gemini") {
     w("sessionId messages.#.id messages.#.timestamp messages.#.type messages.#.model")
     w("messages.#.toolCalls.#.id messages.#.toolCalls.#.name messages.#.toolCalls.#.status messages.#.toolCalls.#.timestamp")
@@ -178,6 +187,7 @@ function jline(s,   n, seg, i, t, j, ch, c1, m) {
   }
 }
 function endc(p, d) {
+  if (K == "agyt" && p == "tool_calls.#") { if (V["tool_calls.#.name"] != "") AGC[++NAGC] = word(V["tool_calls.#.name"]); clr("tool_calls.#."); return }
   if (K == "geminil" && p == "toolCalls.#") { glcall("toolCalls.#."); clr("toolCalls.#."); return }
   if (K == "gemini" && p == "messages.#.toolCalls.#") { gmcall(); clr("messages.#.toolCalls.#."); return }
   if (K == "pi" && p == "message.content.#") { picall(); clr("message.content.#."); return }
@@ -194,6 +204,7 @@ function want() {
   if (K == "codex") return index($0, "\"token_count\"") || index($0, "\"token_usage_record\"") || index($0, "\"turn_context\"") || index($0, "\"session_meta\"") || index($0, "\"task_complete\"") || index($0, "\"task_started\"") || index($0, "_call\"") || index($0, "\"item_completed\"") || index($0, "\"turn_aborted\"") || index($0, "\"compacted\"")
   if (K == "pi") return index($0, "\"usage\"") || index($0, "_change\"") || index($0, "\"session\"") || index($0, "\"cwd\"") || index($0, "\"role\":\"user\"") || index($0, "\"toolResult\"") || index($0, "\"compaction\"")
   if (K == "qwen") return index($0, "\"usageMetadata\"")
+  if (K == "agyt") return index($0, "\"step_index\"")
   if (K == "geminil") return index($0, "\"tokens\"") || index($0, "\"sessionId\"") || index($0, "\"toolCalls\"") || index($0, "\"type\":\"user\"")
   return 1
 }
@@ -217,6 +228,7 @@ function row() {
   else if (K == "pi") pirow()
   else if (K == "qwen") qwrow()
   else if (K == "geminil") glrow()
+  else if (K == "agyt") agyrow()
 }
 
 # ---- Claude Code: assistant lines (one per content block, same message id:
@@ -294,6 +306,8 @@ function cxrow(   t, pt, k) {
     if (V["payload.creator_account_id"] ~ /^[A-Za-z0-9_-]+$/) cA = V["payload.creator_account_id"]
     # a thread another started (a subagent): its lane in that session
     if (V["payload.source.subagent.thread_spawn.parent_thread_id"] != "") print "sl\t" cl(V["timestamp"]) "\t" cl(V["payload.source.subagent.thread_spawn.parent_thread_id"]) "\t" sid() "\t\t" word(V["payload.source.subagent.thread_spawn.agent_role"])
+    # Codex 0.164: the parent at the top, the kind of helper beside it (a guardian review)
+    else if (V["payload.parent_thread_id"] != "") print "sl\t" cl(V["timestamp"]) "\t" cl(V["payload.parent_thread_id"]) "\t" sid() "\t\t" word(V["payload.source.subagent.other"] != "" ? V["payload.source.subagent.other"] : V["payload.thread_source"])
   } else if (t == "turn_context") {
     if (V["payload.model"] != "") cM = cl(V["payload.model"])
     if ("payload.effort" in V) cE = cl(V["payload.effort"])
@@ -434,6 +448,110 @@ function gmrow(   i, o, c, th, k, ts) {
   GR[++NG] = "\t" cl(V["messages.#.timestamp"]) "\t@S@\t@S@:" cl(k) "\t" cl(V["messages.#.model"]) "\t\t" PROJ "\t" f0(i) "\t" f0(o) "\t" f0(c) "\t0\t0\t" f0(th) "\t\t\t0"
 }
 
+# ---- Antigravity CLI: a conversation is brain/<id>/.system_generated/logs/transcript.jsonl
+# (a step a line: the prompt, each request with its tokens and the tools it called, each
+# step after one) beside conversations/<id>.db, whose protobuf rows give each request its
+# model and thinking tokens and the conversation its folder (PBH, PBW lines ahead of the log)
+function agyrow(   s, si, ts, i, o, c, th, m, j) {
+  s = AGS; si = V["step_index"]; ts = cl(V["created_at"])
+  if (si !~ /^[0-9]+$/ || s == "") { NAGC = 0; return }
+  if (V["type"] == "USER_INPUT") {
+    agend(AGL)
+    print "p\t" ts "\t" s "\t\t" s ":" si "\t" ((V["source"] ~ /USER/) ? "u" : "s")
+    AGP = ts; AGPI = si; AGL = ts; NAGC = 0; NAGO = 0; return
+  }
+  if (ts != "") AGL = ts
+  if (V["type"] == "PLANNER_RESPONSE" && (("input_tokens" in V) || ("output_tokens" in V))) {
+    # output_tokens counts thinking already (thinking + the answer, in its row)
+    i = num(V["input_tokens"]); o = num(V["output_tokens"]); c = num(V["cache_read_tokens"])
+    m = (si in AGM) ? AGM[si] : AGLM; if (m != "") AGLM = m
+    th = (si in AGT) ? AGT[si] : 0; if (th > o) th = o
+    emit("u\t" ts "\t" s "\t" s ":" si "\t" cl(m) "\t\t" tl(AGW) "\t" f0(i) "\t" f0(o) "\t" f0(c) "\t0\t0\t" f0(th) "\t\t\t0")
+    for (j = 1; j <= NAGC; j++) {
+      print "ks\t" ts "\t" s "\t\t" s ":" si ":" j "\t" AGC[j] "\t" tclass(AGC[j])
+      AGO[++NAGO] = s ":" si ":" j
+    }
+    # an answer that calls no tool: the prompt is done
+    if (NAGC == 0) agend(ts)
+  } else if (NAGO > 0) {
+    # the step after a request: the tools it called ran, done here
+    for (j = 1; j <= NAGO; j++) print "ke\t" ts "\t" s "\t\t" AGO[j] "\t" ((V["status"] ~ /ERROR|FAIL|CANCEL/) ? "err" : "ok") "\t0"
+    NAGO = 0
+  }
+  NAGC = 0
+}
+# the prompt going on ends at `ts`: a turn record (how long it took)
+function agend(ts,   d) {
+  if (AGP == "" || ts == "") return
+  d = isots(ts) - isots(AGP)
+  if (d > 0) emit("t\t" ts "\t" AGS "\t" AGS ":" AGPI "\t" f0(d * 1000))
+  AGP = ""; AGPI = ""
+}
+# 2026-10-26T19:49:00Z (UTC) → unix seconds (0: not one)
+function isots(s,   y, mo, d, yy, m2) {
+  if (s !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/) return 0
+  y = substr(s, 1, 4) + 0; mo = substr(s, 6, 2) + 0; d = substr(s, 9, 2) + 0
+  yy = (mo <= 2) ? y - 1 : y; m2 = (mo <= 2) ? mo + 9 : mo - 3
+  return (365 * yy + int(yy / 4) - int(yy / 100) + int(yy / 400) + int((153 * m2 + 2) / 5) + d - 719469) * 86400 + substr(s, 12, 2) * 3600 + substr(s, 15, 2) * 60 + substr(s, 18, 2)
+}
+# protobuf, from hex: a byte, a varint (PVI: where it ended), printable text (else empty)
+function hx(h, i) { return index("0123456789ABCDEF", substr(h, i, 1)) - 1 }
+function pbyte(h, i) { return hx(h, 2 * i - 1) * 16 + hx(h, 2 * i) }
+function pvar(h, i,   r, m, c) { r = 0; m = 1; do { c = pbyte(h, i); i++; r += (c % 128) * m; m *= 128 } while (c >= 128 && i <= PBL); PVI = i; return r }
+function pstr(h, i, n,   t, j, c) { t = ""; for (j = 0; j < n && j < 96; j++) { c = pbyte(h, i + j); if (c < 32 || c > 126) return ""; t = t sprintf("%c", c) }; return t }
+# one level of a message (bytes s to e - 1): varints into PF, length-delimited ones into
+# PS / PN (where, how long), by level and field; the key-value entries of the request (1.20)
+# give the step it belongs to (last_step_index)
+function pwalk(h, s, e, lvl,   i, k, f, wt, n) {
+  i = s
+  while (i < e) {
+    k = pvar(h, i); i = PVI; f = int(k / 8); wt = k % 8
+    if (wt == 0) { PF[lvl, f] = pvar(h, i); i = PVI }
+    else if (wt == 1) i += 8
+    else if (wt == 5) i += 4
+    else if (wt == 2) { n = pvar(h, i); i = PVI; PS[lvl, f] = i; PN[lvl, f] = n; if (lvl == 1 && f == 20) agkv(h, i, i + n); i += n }
+    else return
+  }
+}
+function agkv(h, s, e,   i, k, n, key, val) {
+  i = s; key = ""; val = ""
+  while (i < e) {
+    k = pvar(h, i); i = PVI; if (k % 8 != 2) return
+    n = pvar(h, i); i = PVI
+    if (int(k / 8) == 1) key = pstr(h, i, n); else if (int(k / 8) == 2) val = pstr(h, i, n)
+    i += n
+  }
+  if (key == "last_step_index" && val ~ /^[0-9]+$/) GSTEP = val + 0
+}
+# a PBH line (a request: 1.19 its model, 1.4.9 its thinking tokens) or PBW (the conversation:
+# its workspace, file:///…)
+function agmeta(   h, t, p, j, c, m, x, n) {
+  x = substr($0, 5); h = x; sub(/^[^\t]*\t/, "", h); sub(/\t.*$/, "", x)
+  PBL = length(h) / 2
+  if (substr($0, 1, 4) == "PBW\t") {
+    p = index(h, "66696C653A2F2F"); if (p == 0 || p % 2 == 0) return
+    # a string: its length is the byte before it (a path under 128 bytes), else up to
+    # the first byte that is not text
+    j = (p + 1) / 2; n = (j > 1) ? pbyte(h, j - 1) : 0; if (n < 8 || n > 127) n = PBL
+    t = ""; for (c = 0; c < n && j + c <= PBL; c++) { m = pbyte(h, j + c); if (m < 33 || m > 126) break; t = t sprintf("%c", m) }
+    sub(/^file:\/\//, "", t); gsub(/%20/, " ", t)
+    if (t ~ /^\//) AGW = t
+    return
+  }
+  split("", PF); split("", PS); split("", PN); GSTEP = ""
+  pwalk(h, 1, PBL + 1, 0)
+  # the next read starts after the newest row seen (two back: one written meanwhile)
+  if (x ~ /^[0-9]+$/ && x + 1 > AGG) AGG = x + 1
+  if (!((0, 1) in PS)) return
+  pwalk(h, PS[0, 1], PS[0, 1] + PN[0, 1], 1)
+  m = ((1, 19) in PS) ? pstr(h, PS[1, 19], PN[1, 19]) : ""
+  if ((1, 4) in PS) pwalk(h, PS[1, 4], PS[1, 4] + PN[1, 4], 2)
+  if (GSTEP == "") return
+  # the request is the step after the last one it saw
+  if (m != "") AGM[GSTEP + 1] = m
+  if ((2, 9) in PF) AGT[GSTEP + 1] = PF[2, 9]
+}
+
 # ---- OpenCode: a message file (older versions) or rows from opencode.db;
 # output there excludes reasoning
 function ocjrow(   i, o, rs, cr, cw) {
@@ -441,13 +559,24 @@ function ocjrow(   i, o, rs, cr, cw) {
   i = num(V["tokens.input"]); o = num(V["tokens.output"]); rs = num(V["tokens.reasoning"]); cr = num(V["tokens.cache.read"]); cw = num(V["tokens.cache.write"])
   emit("u\t" cl(V["time.created"]) "\t" cl(V["sessionID"]) "\t" cl(V["id"]) "\t" cl(V["modelID"]) "\t" cl(V["variant"]) "\t" tl(V["path.cwd"]) "\t" f0(i) "\t" f0(o + rs) "\t" f0(cr) "\t" f0(cw) "\t0\t" f0(rs) "\t" cost(V["cost"]) "\t\t0\t" prov(V["providerID"]))
 }
-function ocrow(   i, o, rs, cr, cw, k) {
+function ocrow(   i, o, rs, cr, cw, k, fz) {
   if ($0 ~ /^(Error|Parse error|Runtime error)/) { print "x\topencode\t" FP "\t" substr(cl($0), 1, 160); return }
   if (substr($0, 1, 2) == "x\t") { print; return }
   # the timeline: a prompt, a tool call (its start and end), a subagent (a child session)
   if ($1 == "U" && NF >= 5) {
     if ($5 ~ /^[0-9]+$/ && (MAXW == "" || $5 + 0 > MAXW + 0)) MAXW = $5
-    print "p\t" $4 "\t" cl($3) "\t\t" cl($2) "\tu"; return
+    print "p\t" $4 "\t" cl($3) "\t\t" cl($2) "\t" (($6 ~ /^[as]$/) ? $6 : "u"); return
+  }
+  # OpenCode 2: a prompt ended (its time since the prompt; not succeeded: an error)
+  if ($1 == "I" && NF >= 5) {
+    if ($5 ~ /^[0-9]+$/ && (MAXW == "" || $5 + 0 > MAXW + 0)) MAXW = $5
+    if ($4 ~ /^[0-9]+$/ && $6 ~ /^[0-9]+$/ && $4 - $6 > 0) emit("t\t" $4 "\t" cl($3) "\t" cl($2) "\t" f0($4 - $6))
+    if ($7 != "" && $7 != "succeeded") print "e\t" $4 "\t" cl($3) "\t\t" cl($2) "\t" (($7 ~ /abort|cancel|interrupt/) ? "interrupted" : "api")
+    return
+  }
+  if ($1 == "C" && NF >= 5) {
+    if ($5 ~ /^[0-9]+$/ && (MAXW == "" || $5 + 0 > MAXW + 0)) MAXW = $5
+    print "c\t" $4 "\t" cl($3) "\t\t" cl($2) "\t0\t0"; return
   }
   if ($1 == "T" && NF >= 9) {
     if ($9 ~ /^[0-9]+$/ && $9 + 0 > OCP + 0) OCP = $9
@@ -458,17 +587,20 @@ function ocrow(   i, o, rs, cr, cw, k) {
   }
   if ($1 == "S" && NF >= 5) {
     if ($5 ~ /^[0-9]+$/ && $5 + 0 > OCS + 0) OCS = $5
-    print "sl\t" $4 "\t" cl($3) "\t" cl($2) "\t\t"; return
+    print "sl\t" $4 "\t" cl($3) "\t" cl($2) "\t" cl($7) "\t" word($6); return
   }
   if (NF < 14 || $1 == "" || $3 !~ /^[0-9]+$/) return
   if ($4 ~ /^[0-9]+$/ && (MAXW == "" || $4 + 0 > MAXW + 0)) MAXW = $4
   i = num($9); o = num($10); rs = num($11); cr = num($12); cw = num($13)
-  emit("u\t" $3 "\t" cl($2) "\t" cl($1) "\t" cl($5) "\t" cl($7) "\t" tl($8) "\t" f0(i) "\t" f0(o + rs) "\t" f0(cr) "\t" f0(cw) "\t0\t" f0(rs) "\t" cost($14) "\t\t0\t" prov($6))
+  # the models of OpenCode itself (provider opencode), priced by it: $0 is free
+  fz = ($6 == "opencode" && cost($14) != "" && $14 + 0 == 0) ? "z" : ""
+  emit("u\t" $3 "\t" cl($2) "\t" cl($1) "\t" cl($5) "\t" cl($7) "\t" tl($8) "\t" f0(i) "\t" f0(o + rs) "\t" f0(cr) "\t" f0(cw) "\t0\t" f0(rs) "\t" cost($14) "\t" fz "\t0\t" prov($6))
 }
 
 {
   NLINES++
   if (K == "ocdb") { ocrow(); next }
+  if (K == "agyt" && (substr($0, 1, 4) == "PBH\t" || substr($0, 1, 4) == "PBW\t")) { NLINES--; agmeta(); next }
   len = length($0) + 1
   if (LIM >= 0 && POS + len > LIM) { NLINES--; exit }
   POS += len
@@ -492,6 +624,7 @@ END {
   else if (K == "pi") c = cS US cM US cE US cC
   else if (K == "gemini") c = MAXTS
   else if (K == "geminil") c = cS US cF
+  else if (K == "agyt") c = AGP US AGPI US AGG US AGW US AGLM
   print "f\t" FP "\t" f0(nx) "\t" ((c == "") ? "-" : cl(c)) "\t" NLINES "\t" NREC
 }
 "##;
@@ -708,9 +841,25 @@ listing() {
   if on gemini; then
     lst geminil gemini "$HOME/.gemini/tmp" -path '*/chats/*' -name '*.jsonl' || printf 'A\tgemini\tgemini\t-\n'
     lst gemini gemini "$HOME/.gemini/tmp" -path '*/chats/*' -name '*.json'
-    # the account signed in: google_accounts.json holds its email (the tokens live elsewhere, never read)
-    r=$(cd "$HOME/.gemini/tmp" 2>/dev/null && pwd -P) && [ -f "$HOME/.gemini/google_accounts.json" ] &&
-      awk -v r="$r" '{ s = s $0 } END { if (match(s, /"active": *"[^"]*"/)) { v = substr(s, RSTART, RLENGTH); sub(/^[^:]*: *"/, "", v); sub(/"$/, "", v); gsub(/[\t]/, "", v); if (v != "") printf "N\tgemini\t%s\t%s\t%s\n", r, v, v } }' "$HOME/.gemini/google_accounts.json" 2>/dev/null
+    # whose requests they are: settings.json says how it signs in (security.auth.selectedType;
+    # older: selectedAuthType). An API key or Vertex AI bills the key, an account of its own
+    # on this machine (the key is never read); a Google sign-in, the email google_accounts.json
+    # holds (the tokens live elsewhere, never read)
+    r=$(cd "$HOME/.gemini/tmp" 2>/dev/null && pwd -P) && {
+      ga=$(awk '{ s = s $0 } END { if (match(s, /"(selectedType|selectedAuthType)": *"[^"]*"/)) { v = substr(s, RSTART, RLENGTH); sub(/^[^:]*: *"/, "", v); sub(/"$/, "", v); gsub(/[^A-Za-z0-9_.-]/, "", v); print v } }' "$HOME/.gemini/settings.json" 2>/dev/null)
+      case $ga in
+        *api-key*|*vertex*) printf 'N\tgemini\t%s\t\t\t\t\t%s\t\n' "$r" "$ga" ;;
+        *) [ -f "$HOME/.gemini/google_accounts.json" ] &&
+             awk -v r="$r" -v ga="$ga" '{ s = s $0 } END { if (match(s, /"active": *"[^"]*"/)) { v = substr(s, RSTART, RLENGTH); sub(/^[^:]*: *"/, "", v); sub(/"$/, "", v); gsub(/[\t]/, "", v); if (v != "") printf "N\tgemini\t%s\t%s\t%s\t\t\t%s\t\n", r, v, v, ga } }' "$HOME/.gemini/google_accounts.json" 2>/dev/null ;;
+      esac
+    }
+  fi
+  if on agy; then
+    lst agyt agy "$HOME/.gemini/antigravity-cli/brain" -path '*/.system_generated/logs/transcript.jsonl' || printf 'A\tagy\tagyt\t-\n'
+    # it signs in with Google (its tokens in the keyring, never read): the email
+    # google_accounts.json holds, shared with Gemini CLI
+    r=$(cd "$HOME/.gemini/antigravity-cli/brain" 2>/dev/null && pwd -P) && [ -f "$HOME/.gemini/google_accounts.json" ] &&
+      awk -v r="$r" '{ s = s $0 } END { if (match(s, /"active": *"[^"]*"/)) { v = substr(s, RSTART, RLENGTH); sub(/^[^:]*: *"/, "", v); sub(/"$/, "", v); gsub(/[\t]/, "", v); if (v != "") printf "N\tagy\t%s\t%s\t%s\t\t\tgoogle\t\n", r, v, v } }' "$HOME/.gemini/google_accounts.json" 2>/dev/null
   fi
   if on qwen; then
     lst qwen qwen "$HOME/.qwen/tmp" -path '*/chats/*' -name '*.jsonl' || printf 'A\tqwen\tqwen\t-\n'
@@ -721,11 +870,13 @@ listing() {
 # opencode.db rows changed after the watermark (ms), assistant messages only
 ocdb() {
   w=$2; [ "$w" -gt 0 ] 2>/dev/null || w=$CUT
-  t=$($SQL -readonly -batch -noheader "$1" "select count(*) from sqlite_master where type='table' and name='message';" 2>&1 </dev/null)
-  if [ "$t" != 1 ]; then
-    printf 'x\topencode\t%s\tno message table: %s\n' "$1" "$(printf '%s' "$t" | tr '\t\n' '  ' | cut -c1-160)"
-    return
-  fi
+  t=$($SQL -readonly -batch -noheader "$1" "select group_concat(name) from sqlite_master where type='table' and name in ('message','session_message');" 2>&1 </dev/null)
+  case ",$t," in
+    *,session_message,*) ocdb2 "$@"; return ;;
+    *,message,*) ;;
+    *) printf 'x\topencode\t%s\tno message table: %s\n' "$1" "$(printf '%s' "$t" | tr '\t\n' '  ' | cut -c1-160)"
+       return ;;
+  esac
   $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select m.id, m.session_id, m.time_created, m.time_updated, json_extract(m.data,'\$.modelID'), json_extract(m.data,'\$.providerID'), json_extract(m.data,'\$.variant'), json_extract(m.data,'\$.path.cwd'), json_extract(m.data,'\$.tokens.input'), json_extract(m.data,'\$.tokens.output'), json_extract(m.data,'\$.tokens.reasoning'), json_extract(m.data,'\$.tokens.cache.read'), json_extract(m.data,'\$.tokens.cache.write'), json_extract(m.data,'\$.cost') from message m where m.time_updated > $w and json_extract(m.data,'\$.role') = 'assistant' order by m.time_updated limit 20000;" 2>&1 </dev/null
   # the timeline: prompts (user messages), tool calls (parts), subagents (child sessions);
   # watermarks of their own in the ctx (parts, sessions), and no complaint where a table is missing
@@ -734,6 +885,40 @@ ocdb() {
   $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'U', m.id, m.session_id, m.time_created, m.time_updated from message m where m.time_updated > $w and json_extract(m.data,'\$.role') = 'user' order by m.time_updated limit 20000;" 2>/dev/null </dev/null
   $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'T', p.id, p.session_id, json_extract(p.data,'\$.tool'), json_extract(p.data,'\$.callID'), json_extract(p.data,'\$.state.status'), json_extract(p.data,'\$.state.time.start'), json_extract(p.data,'\$.state.time.end'), p.time_updated from part p where p.time_updated > $pw and json_extract(p.data,'\$.type') = 'tool' order by p.time_updated limit 20000;" 2>/dev/null </dev/null
   $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'S', s.id, s.parent_id, s.time_created, s.time_updated from session s where s.parent_id is not null and s.time_updated > $sw order by s.time_updated limit 5000;" 2>/dev/null </dev/null
+}
+
+# OpenCode 2: sessions in session_v2, their messages in session_message, a type per
+# row (user; assistant = one request, its tool calls inside; idle = a prompt ended;
+# compaction). Old messages were copied over with their ids, so a record read from
+# the old tables is the same record. Rows print in the old reader's columns.
+ocdb2() {
+  w=$2; [ "$w" -gt 0 ] 2>/dev/null || w=$CUT
+  sw=$(printf '%s' "$3" | cut -d"$US" -f2); [ "$sw" -gt 0 ] 2>/dev/null || sw=$CUT
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select m.id, m.session_id, m.time_created, m.time_updated, json_extract(m.data,'\$.model.id'), json_extract(m.data,'\$.model.providerID'), json_extract(m.data,'\$.model.variant'), s.directory, json_extract(m.data,'\$.tokens.input'), json_extract(m.data,'\$.tokens.output'), json_extract(m.data,'\$.tokens.reasoning'), json_extract(m.data,'\$.tokens.cache.read'), json_extract(m.data,'\$.tokens.cache.write'), json_extract(m.data,'\$.cost') from session_message m left join session_v2 s on s.id = m.session_id where m.type = 'assistant' and m.time_updated > $w order by m.time_updated limit 20000;" 2>&1 </dev/null
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'U', m.id, m.session_id, m.time_created, m.time_updated, case when m.type = 'synthetic' then 's' when s.parent_id is not null then 'a' else 'u' end from session_message m left join session_v2 s on s.id = m.session_id where m.type in ('user','synthetic') and m.time_updated > $w order by m.time_updated limit 20000;" 2>/dev/null </dev/null
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'T', json_extract(c.value,'\$.id'), m.session_id, json_extract(c.value,'\$.name'), json_extract(c.value,'\$.id'), json_extract(c.value,'\$.state.status'), json_extract(c.value,'\$.time.created'), json_extract(c.value,'\$.time.completed'), m.time_updated from session_message m, json_each(m.data,'\$.content') c where m.type = 'assistant' and m.time_updated > $w and json_extract(c.value,'\$.type') = 'tool' order by m.time_updated limit 50000;" 2>/dev/null </dev/null
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'I', i.id, i.session_id, i.time_created, i.time_updated, (select max(u.time_created) from session_message u where u.session_id = i.session_id and u.type = 'user' and u.seq < i.seq), json_extract(i.data,'\$.outcome') from session_message i where i.type = 'idle' and i.time_updated > $w order by i.time_updated limit 20000;" 2>/dev/null </dev/null
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'C', c.id, c.session_id, c.time_created, c.time_updated from session_message c where c.type = 'compaction' and c.time_updated > $w order by c.time_updated limit 5000;" 2>/dev/null </dev/null
+  $SQL -readonly -batch -noheader -separator "$TAB" -cmd '.timeout 3000' "$1" "select 'S', s.id, s.parent_id, s.time_created, s.time_updated, s.agent, (select json_extract(c.value,'\$.id') from session_message m, json_each(m.data,'\$.content') c where m.session_id = s.parent_id and m.type = 'assistant' and json_extract(c.value,'\$.state.metadata.sessionId') = s.id limit 1) from session_v2 s where s.parent_id is not null and s.time_updated > $sw order by s.time_updated limit 5000;" 2>/dev/null </dev/null
+}
+
+# Antigravity CLI: the conversation database beside a transcript, as hex for the reader —
+# the requests not matched yet (each one's model and thinking tokens) and, once, the
+# conversation (its folder); read only, never its text
+agymeta() {
+  [ -n "$SQL" ] || return 0
+  id=${1%/.system_generated/*}; id=${id##*/}
+  db="$HOME/.gemini/antigravity-cli/conversations/$id.db"
+  [ -f "$db" ] || return 0
+  # the carried state (`-`: none; cut -s, so a state of one field reads as none either)
+  c=$2; [ "$c" = - ] && c=
+  g=$(printf '%s' "$c" | cut -s -d"$US" -f3); [ "$g" -gt 2 ] 2>/dev/null || g=2
+  q="select 'PBH', idx, hex(data) from gen_metadata where idx >= $((g - 2)) order by idx;"
+  [ -n "$(printf '%s' "$c" | cut -s -d"$US" -f4)" ] || q="$q select 'PBW', 0, hex(data) from trajectory_metadata_blob;"
+  # read only; a database with no reader open has no -shm to share: as it is on disk then
+  for m in 'mode=ro' 'mode=ro&immutable=1'; do
+    o=$($SQL -batch -noheader -separator "$TAB" -cmd '.timeout 2000' "file:$db?$m" "$q" 2>/dev/null </dev/null) && { [ -n "$o" ] && printf '%s\n' "$o"; return 0; }
+  done
 }
 
 # the bytes of a log from an offset (compressed rollouts whole)
@@ -762,6 +947,8 @@ readall() {
     printf 'F\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$ag" "$k" "$p" "$dv" "$ino" "$sz" "$mt" "$st"
     if [ "$k" = ocdb ]; then
       ocdb "$p" "$st" "$ctx" | CTX=$ctx FP=$p SZ=$sz awk -v K=ocdb -v OFF="$st" -v LIM=-1 "$RD"
+    elif [ "$k" = agyt ]; then
+      { agymeta "$p" "$ctx"; src "$p" "$st"; } | CTX=$ctx FP=$p SZ=$sz awk -v K=agyt -v OFF="$st" -v LIM="$lim" "$RD"
     else
       src "$p" "$st" | CTX=$ctx FP=$p SZ=$sz awk -v K="$k" -v OFF="$st" -v LIM="$lim" "$RD"
     fi
@@ -1207,6 +1394,25 @@ pub fn parse_output(text: &str, host: &str) -> Output {
 pub(crate) mod tests {
 
     #[test]
+    fn the_awk_programs_hold_no_single_quote() {
+        // they go into the script inside '…': one apostrophe (a comment's
+        // "call's") ends the quoting and breaks every reader
+        for (name, awk) in [
+            ("READ_AWK", READ_AWK),
+            ("JOIN_AWK", JOIN_AWK),
+            ("STAT_AWK", STAT_AWK),
+        ] {
+            let bad: Vec<(usize, &str)> = awk
+                .lines()
+                .enumerate()
+                .filter(|(_, l)| l.contains('\''))
+                .map(|(n, l)| (n + 1, l))
+                .collect();
+            assert!(bad.is_empty(), "{name} has a single quote: {bad:?}");
+        }
+    }
+
+    #[test]
     fn plans_and_their_absence() {
         let out = parse_output(
             "P\tclaude\t1792737920957\tclaude\tdefault_claude_max_20x\t13\t300\t2026-10-23T10:59:59Z\t\t44\t10080\t\t\tacct-1\nQ\tcodex\n",
@@ -1378,6 +1584,32 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(ends.len(), 2);
         assert_eq!((ends[1].name.as_str(), ends[1].n1), ("err", 2_000));
+    }
+
+    #[test]
+    fn codex_0164_helper_threads_are_lanes_of_their_parent() {
+        use crate::usage::steps::Kind::*;
+        let dir = std::env::temp_dir().join(format!("ch-codex-guard-{}", std::process::id()));
+        let f = dir.join("sessions/2026/10/26/rollout-2026-10-26T15-04-34-019a0003-cab0-7012-87d0-000000000003.jsonl");
+        std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        std::fs::write(
+            &f,
+            concat!(
+                r#"{"timestamp":"2026-10-26T09:34:34.672Z","type":"session_meta","payload":{"session_id":"019a0003-ca6e-73a2-a75b-000000000001","id":"019a0003-cab0-7012-87d0-000000000003","parent_thread_id":"019a0003-ca6e-73a2-a75b-000000000001","cwd":"/home/u/px","originator":"codex-tui","cli_version":"0.164.0","source":{"subagent":{"other":"guardian"}},"thread_source":"guardian_review","base_instructions":"SECRET"}}"#,
+                "\n",
+                r#"{"timestamp":"2026-10-26T09:34:35.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}"#,
+                "\n"
+            ),
+        )
+        .unwrap();
+        let out = read("codex", &f, 0, -1, "", "/home/u");
+        let lane = steps_of(&out, "codex").into_iter().find(|s| s.kind == Lane);
+        let lane = lane.unwrap_or_else(|| panic!("no lane in {out:?}"));
+        assert_eq!(lane.session, "019a0003-ca6e-73a2-a75b-000000000001");
+        assert_eq!(lane.lane, "019a0003-cab0-7012-87d0-000000000003");
+        assert_eq!(lane.name, "guardian");
+        assert!(!out.join("\n").contains("SECRET"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

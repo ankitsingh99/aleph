@@ -372,7 +372,8 @@ impl Hub {
         let polled = |h: &str| {
             fleet
                 .host(h)
-                .is_some_and(|x| matches!(x.conn, crate::fleet::Conn::Up) && !x.stale)
+                // (a paused machine's sessions are as last seen: no answer is known)
+                .is_some_and(|x| matches!(x.conn, crate::fleet::Conn::Up) && !x.stale && !x.paused)
         };
         let stale = crate::events::stale_questions(
             &evs,

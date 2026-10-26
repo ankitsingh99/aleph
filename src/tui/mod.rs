@@ -796,6 +796,8 @@ impl Dash {
         self.cfg = Config::load();
         crate::theme::assign_machine_colors(&mut self.cfg);
         self.fleet.outages = crate::fleet::Outages::from_cfg(&self.cfg);
+        // a machine paused or resumed elsewhere (another dashboard, aleph settings)
+        self.fleet.follow_paused(&self.cfg);
         settings::reapply_all(self);
         let after = profile_of(&self.cfg);
         if before != after {
@@ -3652,14 +3654,28 @@ pub fn run_dashboard_in(tui: Tui, cfg: Config, start: Start) -> std::process::Ex
                 pause();
             }
             Handoff::Install { agent, host, .. } => {
-                let _ = tui.suspend();
-                crate::agentcmd::install_flow(
-                    &d.cfg,
-                    agent,
-                    std::slice::from_ref(host),
-                    crate::agentcmd::InstallOpts::default(),
-                );
-                pause();
+                // setup's install screen, right here: the agent, then its herdr
+                // integration (a fresh agent's missing folder is made first)
+                use onboard::{Action, Step};
+                let mut want = vec![(
+                    Step::Agents,
+                    Action::AgentInstall {
+                        host: host.clone(),
+                        agent: agent.clone(),
+                    },
+                )];
+                if let Some(name) = crate::agents::find(agent).and_then(|a| a.integration) {
+                    want.push((
+                        Step::Agents,
+                        Action::Integration {
+                            host: host.clone(),
+                            name: name.to_string(),
+                        },
+                    ));
+                }
+                if let Err(e) = onboard::run_actions_in(&mut tui, Config::load(), want) {
+                    d.flash(e, true);
+                }
             }
         }
         if let Err(e) = tui.resume() {

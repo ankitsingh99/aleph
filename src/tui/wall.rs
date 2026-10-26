@@ -1771,6 +1771,14 @@ pub(crate) fn on_key(d: &mut Dash, k: KeyEvent) -> Option<Handoff> {
             d.mode = Mode::Palette(super::palette::Palette::new(d));
             return None;
         }
+        // ctrl+a: the approval board while anything waits on you (else it's
+        // the agent's: the start of its line)
+        if ks == d.keys.key_for(super::Act::Approvals)
+            && d.fleet.sessions().iter().any(|s| s.blocked())
+        {
+            super::approvals::open(d);
+            return None;
+        }
         let Some(s) = d.wall.focus().and_then(|id| session_of(d, id)) else {
             d.wall.typing = false;
             return None;
@@ -2617,7 +2625,7 @@ fn draw_session(
     };
     match &s {
         Some(s) => {
-            let (st, scol) = super::fleet::status_spans(s, d.t0);
+            let (st, scol) = super::fleet::status_for(d, s);
             let folder = host.map(|x| x.short_path(&s.cwd)).unwrap_or_default();
             let mut title = vec![
                 Span::styled(format!(" {n} "), ui::faint()),
@@ -2636,7 +2644,11 @@ fn draw_session(
             if let Some(l) = super::usage::live_for(d, s) {
                 let used: usize = title.iter().map(|x| ui::width(&x.content)).sum();
                 let room = (rect.width as usize).saturating_sub(used + ui::width(&st) + 8);
-                let mut model = l.model.clone();
+                let mut model = crate::timeline::short_model(&l.model);
+                if l.models.len() > 1 {
+                    // it switched: how many it has been on
+                    model = format!("{model} ({} models)", l.models.len());
+                }
                 if !l.effort.is_empty() {
                     model = format!("{model} {}", l.effort);
                 }
@@ -2789,7 +2801,7 @@ fn draw_compose(d: &Dash, f: &mut Frame, inner: Rect, c: &Compose, s: Option<&Se
                 Span::styled(" · Q manage ", ui::faint()),
             ]));
         } else if !matches!(s.status.as_str(), "idle" | "done") {
-            let (st, col) = super::fleet::status_spans(s, d.t0);
+            let (st, col) = super::fleet::status_for(d, s);
             block = block.title_bottom(Line::from(vec![
                 Span::styled(format!(" {st}"), ui::fg(col)),
                 Span::styled(" — tab sends it once it's done ", ui::faint()),
@@ -2848,7 +2860,7 @@ fn draw_queue(d: &mut Dash, f: &mut Frame, area: Rect) {
     let w = 76.min(area.width.saturating_sub(4));
     let h = (q.len() as u16 + 6).min(area.height.saturating_sub(2));
     let r = ui::centered(area, w, h);
-    let (st, col) = super::fleet::status_spans(&s, d.t0);
+    let (st, col) = super::fleet::status_for(d, &s);
     let block = Block::bordered()
         .border_set(crate::ui::border_set(false))
         .border_style(ui::fg(c::BLUE()))
@@ -3064,6 +3076,10 @@ pub(crate) fn cheatsheet(d: &Dash, f: &mut Frame, area: Rect) {
             "leave Focus at once, even while typing (focus.exit; esc is the agent's)",
         ),
         row("ctrl+]", "keys back to Aleph (or a click outside)"),
+        row(
+            "ctrl+a",
+            "the approval board, typing too, while anything waits on you (else the agent's)",
+        ),
         row(
             "ctrl+k",
             "the palette, typing too (the agent never gets ctrl+k)",
