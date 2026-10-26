@@ -1362,7 +1362,7 @@ impl Herdr {
         // OpenCode with OpenRouter: only the free (or only the paid) models, as
         // config of its own for that session (`openrouter.models`; not a secret)
         let oc = (mine && kind == "opencode" && crate::openrouter::configured(&cfg))
-            .then(|| crate::openrouter::opencode_config(&cfg))
+            .then(|| crate::openrouter::opencode_config_for_session(&cfg, &o.args))
             .flatten();
         let mut k = 0;
         let shape = shape.map(&mut |l| {

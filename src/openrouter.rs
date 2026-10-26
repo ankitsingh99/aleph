@@ -634,9 +634,39 @@ pub struct Model {
     pub output: Option<f64>,
     /// $ per million cached input tokens read (None: not said)
     pub cache_read: Option<f64>,
+    /// Coding benchmark index (0-100, e.g. Artificial Analysis)
+    pub coding_index: Option<f64>,
+    /// Agentic benchmark index (0-100)
+    pub agentic_index: Option<f64>,
+    /// General intelligence index (0-100)
+    pub intelligence_index: Option<f64>,
+    /// Design Arena coding ELO
+    pub elo: Option<f64>,
 }
 
 impl Model {
+    /// Performance score for coding agents (higher is better).
+    /// Combines coding benchmark (Artificial Analysis coding index), agentic index,
+    /// intelligence index, Design Arena ELO, and context length.
+    pub fn performance(&self) -> f64 {
+        let mut score = 0.0;
+        if let Some(c) = self.coding_index {
+            score += c;
+        }
+        if let Some(a) = self.agentic_index {
+            score += a * 0.5;
+        }
+        if let Some(i) = self.intelligence_index {
+            score += i * 0.3;
+        }
+        if let Some(elo) = self.elo {
+            score += ((elo - 1000.0) / 20.0).max(0.0);
+        }
+        // Context length provides a secondary signal when benchmarks are equal or absent
+        let ctx_bonus = (self.context as f64 / 100_000.0).min(10.0);
+        score + ctx_bonus
+    }
+
     /// `256k ctx · $0.22/$0.95` (what the picker shows beside it).
     pub fn facts(&self) -> String {
         let ctx = match self.context {
@@ -702,6 +732,33 @@ pub fn parse_models(v: &Value) -> Vec<Model> {
                 return None;
             }
             let pricing = m.get("pricing").and_then(Value::as_object);
+            let benchmarks = m.get("benchmarks").and_then(Value::as_object);
+            let aa = benchmarks
+                .and_then(|b| b.get("artificial_analysis"))
+                .and_then(Value::as_object);
+            let coding_index = aa.and_then(|a| num(a, &["coding_index"]));
+            let agentic_index = aa.and_then(|a| num(a, &["agentic_index"]));
+            let intelligence_index = aa.and_then(|a| num(a, &["intelligence_index"]));
+            let elo = benchmarks
+                .and_then(|b| b.get("design_arena"))
+                .and_then(Value::as_array)
+                .and_then(|arr| {
+                    arr.iter()
+                        .find_map(|item| {
+                            let obj = item.as_object()?;
+                            if obj.get("category").and_then(Value::as_str) == Some("codecategories") {
+                                num(obj, &["elo"])
+                            } else {
+                                None
+                            }
+                        })
+                        .or_else(|| {
+                            arr.iter()
+                                .filter_map(|item| num(item.as_object()?, &["elo"]))
+                                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                        })
+                });
+
             Some(Model {
                 name: text(m, &["name"]).unwrap_or_else(|| id.clone()),
                 context: num(m, &["context_length"])
@@ -714,6 +771,10 @@ pub fn parse_models(v: &Value) -> Vec<Model> {
                 input: pricing.and_then(|p| per_mtok(p.get("prompt"))),
                 output: pricing.and_then(|p| per_mtok(p.get("completion"))),
                 cache_read: pricing.and_then(|p| per_mtok(p.get("input_cache_read"))),
+                coding_index,
+                agentic_index,
+                intelligence_index,
+                elo,
                 id,
             })
         })
@@ -727,15 +788,28 @@ fn models_file() -> PathBuf {
 fn models_json(at: u64, v: &[Model]) -> Value {
     json!({
         "at": at,
-        "data": v.iter().map(|m| json!({
-            "id": m.id, "name": m.name, "context_length": m.context,
-            // kept as OpenRouter writes them ($ per token)
-            "pricing": {
-                "prompt": m.input.map(|x| x / 1e6),
-                "completion": m.output.map(|x| x / 1e6),
-                "input_cache_read": m.cache_read.map(|x| x / 1e6),
-            },
-        })).collect::<Vec<_>>(),
+        "data": v.iter().map(|m| {
+            let mut obj = json!({
+                "id": m.id, "name": m.name, "context_length": m.context,
+                // kept as OpenRouter writes them ($ per token)
+                "pricing": {
+                    "prompt": m.input.map(|x| x / 1e6),
+                    "completion": m.output.map(|x| x / 1e6),
+                    "input_cache_read": m.cache_read.map(|x| x / 1e6),
+                },
+            });
+            if m.coding_index.is_some() || m.agentic_index.is_some() || m.intelligence_index.is_some() || m.elo.is_some() {
+                obj["benchmarks"] = json!({
+                    "artificial_analysis": {
+                        "coding_index": m.coding_index,
+                        "agentic_index": m.agentic_index,
+                        "intelligence_index": m.intelligence_index,
+                    },
+                    "design_arena": m.elo.map(|e| json!([{"category": "codecategories", "elo": e}])).unwrap_or_else(|| json!([])),
+                });
+            }
+            obj
+        }).collect::<Vec<_>>(),
     })
 }
 
@@ -747,6 +821,20 @@ pub fn models_cached() -> Option<(u64, Vec<Model>)> {
     Some((at, parse_models(&v)))
 }
 
+/// Read models from OpenRouter now (no key needed) and keep them.
+pub fn fetch_models() -> Result<Vec<Model>, String> {
+    let v = get("/models", None).map(|v| parse_models(&v))?;
+    if !v.is_empty() {
+        let _ = crate::config::write_atomic(
+            &models_file(),
+            models_json(crate::cache::now(), &v).to_string().as_bytes(),
+        );
+        Ok(v)
+    } else {
+        Err("OpenRouter listed no models".into())
+    }
+}
+
 /// OpenRouter's models: the kept list when it's under a day old, else read
 /// now (no key needed) and kept; a failed read falls back to an older list.
 pub fn models() -> Result<Vec<Model>, String> {
@@ -756,17 +844,8 @@ pub fn models() -> Result<Vec<Model>, String> {
             return Ok(v.clone());
         }
     }
-    match get("/models", None).map(|v| parse_models(&v)) {
-        Ok(v) if !v.is_empty() => {
-            let _ = crate::config::write_atomic(
-                &models_file(),
-                models_json(crate::cache::now(), &v).to_string().as_bytes(),
-            );
-            Ok(v)
-        }
-        Ok(_) => kept
-            .map(|k| k.1)
-            .ok_or_else(|| "OpenRouter listed no models".into()),
+    match fetch_models() {
+        Ok(v) => Ok(v),
         Err(e) => match kept {
             Some((_, v)) if !v.is_empty() => Ok(v),
             _ => Err(e),
@@ -815,38 +894,141 @@ pub fn is_free(m: &Model) -> bool {
     m.id.ends_with(":free") || (m.input == Some(0.0) && m.output == Some(0.0))
 }
 
-/// OpenCode's own config for `openrouter.models` (pure): only the free ones
-/// (a whitelist), or none of them (a blacklist); None for all, or with no
-/// list to name them from.
+/// The free models, sorted by performance (best first).
+pub fn free_models_by_performance(models: &[Model]) -> Vec<Model> {
+    let mut free: Vec<Model> = models.iter().filter(|m| is_free(m)).cloned().collect();
+    free.sort_by(|a, b| {
+        b.performance()
+            .partial_cmp(&a.performance())
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    free
+}
+
+/// The best free model by performance (None if no free models).
+pub fn best_free_model(models: &[Model]) -> Option<Model> {
+    free_models_by_performance(models).into_iter().next()
+}
+
+/// Resolves a requested model ID. If "free" or "openrouter/free" is given,
+/// resolves to the best free model by performance from `models`.
+pub fn resolve_model(id: &str, models: &[Model]) -> String {
+    let stripped = id.trim().trim_start_matches("openrouter/");
+    if stripped == "free" || stripped == "auto:free" {
+        if let Some(best) = best_free_model(models) {
+            return best.id;
+        }
+    }
+    id.to_string()
+}
+
+/// OpenCode's own config for `openrouter.models` (pure):
+/// - "free": sorts free models by performance, sets the best free model as `model`,
+///   configures `fallback_models` with the next free models in order of performance,
+///   and sets `provider.openrouter.whitelist` and `provider.openrouter.body.models`
+///   so OpenRouter automatically falls back to subsequent free models on failure.
+/// - "paid": blacklists free models.
+/// - "all": None.
+#[allow(dead_code)]
 pub fn opencode_config_for(choice: &str, models: &[Model]) -> Option<String> {
-    let free: Vec<&str> = models
-        .iter()
-        .filter(|m| is_free(m))
-        .map(|m| m.id.as_str())
-        .collect();
+    opencode_config_for_preferred(choice, models, None)
+}
+
+/// [`opencode_config_for`] with an optional preferred free model (e.g. from CLI or form)
+/// to prioritize ahead of other free fallback models.
+pub fn opencode_config_for_preferred(
+    choice: &str,
+    models: &[Model],
+    preferred: Option<&str>,
+) -> Option<String> {
+    let mut ranked_free = free_models_by_performance(models);
     let key = match choice {
         "free" => "whitelist",
         "paid" => "blacklist",
         _ => return None,
     };
-    if free.is_empty() {
+    if ranked_free.is_empty() {
         return None;
     }
-    Some(json!({"provider": {"openrouter": {key: free}}}).to_string())
+    if choice == "free" {
+        if let Some(pref) = preferred {
+            let pref = pref.trim().trim_start_matches("openrouter/");
+            if let Some(pos) = ranked_free.iter().position(|m| m.id == pref) {
+                let m = ranked_free.remove(pos);
+                ranked_free.insert(0, m);
+            }
+        }
+        let best_id = ranked_free[0].id.clone();
+        let free_ids: Vec<String> = ranked_free.iter().map(|m| m.id.clone()).collect();
+        let fallbacks: Vec<String> = ranked_free
+            .iter()
+            .skip(1)
+            .map(|m| format!("openrouter/{}", m.id))
+            .collect();
+        Some(
+            json!({
+                "model": format!("openrouter/{best_id}"),
+                "fallback_models": fallbacks,
+                "provider": {
+                    "openrouter": {
+                        "whitelist": free_ids,
+                        "body": {
+                            "models": free_ids
+                        }
+                    }
+                }
+            })
+            .to_string(),
+        )
+    } else {
+        let free_ids: Vec<&str> = ranked_free.iter().map(|m| m.id.as_str()).collect();
+        Some(json!({"provider": {"openrouter": {key: free_ids}}}).to_string())
+    }
 }
 
 /// [`opencode_config_for`] with the setting and the kept list (read now when
 /// there's none: a new session's thread, never the UI's).
+#[allow(dead_code)]
 pub fn opencode_config(cfg: &Config) -> Option<String> {
+    opencode_config_for_session(cfg, &[])
+}
+
+/// [`opencode_config_for`] for a new session with `cfg` and its arguments.
+/// If `choice` is "free" or if `args` requests a free model (e.g. `--openrouter free`),
+/// it fetches/loads the model list, selects the best free model by performance, and
+/// sets up the fallback chain.
+pub fn opencode_config_for_session(cfg: &Config, args: &[String]) -> Option<String> {
     let choice = cfg.get_or("openrouter.models");
-    if choice == "all" {
-        return None;
+    let mut preferred: Option<&str> = None;
+    let mut free_requested = choice == "free";
+    for a in args {
+        let s = a.as_str();
+        if s == "free" || s == "openrouter/free" || s.starts_with("--openrouter=free") {
+            free_requested = true;
+        } else if let Some(m) = s.strip_prefix("--openrouter=") {
+            if m.contains(":free") {
+                free_requested = true;
+                preferred = Some(m);
+            }
+        } else if s.contains(":free") {
+            free_requested = true;
+            preferred = Some(s);
+        }
     }
-    let list = match models_cached() {
-        Some((_, v)) if !v.is_empty() => v,
-        _ => models().ok()?,
+    let eff_choice = if free_requested {
+        "free"
+    } else if choice == "paid" {
+        "paid"
+    } else {
+        return None;
     };
-    opencode_config_for(&choice, &list)
+    // Fetch fresh models if possible, falling back to cached list
+    let list = fetch_models()
+        .ok()
+        .or_else(|| models_cached().map(|(_, v)| v))
+        .or_else(|| models().ok())?;
+    opencode_config_for_preferred(eff_choice, &list, preferred)
 }
 
 /// The daemon's daily read of OpenRouter's model list (prices for models the

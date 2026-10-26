@@ -1555,7 +1555,7 @@ pub const KNOWN: &[Known] = &[
         key: "openrouter.models",
         default: "all",
         kind: Kind::Choice(&["all", "free", "paid"]),
-        help: "which of OpenRouter's models to use: all, only the free ones ($0, the :free variants), or only paid ones. The new-session form's model picker lists just those, and OpenCode sessions Aleph starts get the same as their own config (OPENCODE_CONFIG_CONTENT: provider.openrouter.whitelist / blacklist; your opencode.json is never touched)",
+        help: "which of OpenRouter's models to use: all, only the free ones ($0, the :free variants), or only paid ones. For OpenCode sessions with free models, Aleph automatically selects the highest-performing model based on benchmarks and configures fallback to subsequent free models on failure. The new-session form's model picker lists just those, and OpenCode sessions Aleph starts get the same as their own config (OPENCODE_CONFIG_CONTENT: model, fallback_models, provider.openrouter.whitelist / blacklist; your opencode.json is never touched)",
     },
     Known {
         key: "ui.whats_new",

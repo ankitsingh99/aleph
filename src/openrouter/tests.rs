@@ -229,6 +229,16 @@ fn free_or_paid_only_as_opencodes_own_config() {
         free["provider"]["openrouter"]["whitelist"],
         json!(["qwen/qwen3-coder:free"])
     );
+    assert_eq!(
+        free["model"],
+        json!("openrouter/qwen/qwen3-coder:free")
+    );
+    assert_eq!(
+        free["provider"]["openrouter"]["body"]["models"],
+        json!(["qwen/qwen3-coder:free"])
+    );
+    assert_eq!(free["fallback_models"], json!([]));
+
     let paid: Value = serde_json::from_str(&opencode_config_for("paid", &all).unwrap()).unwrap();
     assert_eq!(
         paid["provider"]["openrouter"]["blacklist"],
@@ -239,4 +249,155 @@ fn free_or_paid_only_as_opencodes_own_config() {
         opencode_config_for("free", &[]).is_none(),
         "no list: nothing to name"
     );
+}
+
+#[test]
+fn free_models_ranked_by_performance_and_fallbacks() {
+    let models = vec![
+        Model {
+            id: "slow/free-coder:free".into(),
+            name: "Slow Coder".into(),
+            context: 64_000,
+            input: Some(0.0),
+            output: Some(0.0),
+            cache_read: None,
+            coding_index: Some(15.0),
+            agentic_index: Some(5.0),
+            intelligence_index: Some(10.0),
+            elo: None,
+        },
+        Model {
+            id: "top/super-coder:free".into(),
+            name: "Top Super Coder".into(),
+            context: 1_000_000,
+            input: Some(0.0),
+            output: Some(0.0),
+            cache_read: None,
+            coding_index: Some(55.0),
+            agentic_index: Some(25.0),
+            intelligence_index: Some(30.0),
+            elo: Some(1250.0),
+        },
+        Model {
+            id: "mid/decent-coder:free".into(),
+            name: "Mid Coder".into(),
+            context: 256_000,
+            input: Some(0.0),
+            output: Some(0.0),
+            cache_read: None,
+            coding_index: Some(35.0),
+            agentic_index: Some(15.0),
+            intelligence_index: Some(20.0),
+            elo: Some(1100.0),
+        },
+        Model {
+            id: "paid/ultra".into(),
+            name: "Paid Model".into(),
+            context: 500_000,
+            input: Some(2.0),
+            output: Some(8.0),
+            cache_read: None,
+            coding_index: Some(90.0),
+            agentic_index: Some(80.0),
+            intelligence_index: Some(85.0),
+            elo: Some(1400.0),
+        },
+    ];
+
+    let ranked = free_models_by_performance(&models);
+    let ids: Vec<&str> = ranked.iter().map(|m| m.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec![
+            "top/super-coder:free",
+            "mid/decent-coder:free",
+            "slow/free-coder:free"
+        ]
+    );
+
+    let best = best_free_model(&models).unwrap();
+    assert_eq!(best.id, "top/super-coder:free");
+
+    assert_eq!(
+        resolve_model("free", &models),
+        "top/super-coder:free"
+    );
+    assert_eq!(
+        resolve_model("openrouter/free", &models),
+        "top/super-coder:free"
+    );
+    assert_eq!(
+        resolve_model("custom/model", &models),
+        "custom/model"
+    );
+
+    let cfg_str = opencode_config_for("free", &models).unwrap();
+    let cfg_val: Value = serde_json::from_str(&cfg_str).unwrap();
+
+    // Best model used as active model
+    assert_eq!(cfg_val["model"], "openrouter/top/super-coder:free");
+
+    // Fallbacks ordered by performance
+    assert_eq!(
+        cfg_val["fallback_models"],
+        json!([
+            "openrouter/mid/decent-coder:free",
+            "openrouter/slow/free-coder:free"
+        ])
+    );
+
+    // Whitelist and body.models containing the full ranked fallback list
+    assert_eq!(
+        cfg_val["provider"]["openrouter"]["whitelist"],
+        json!([
+            "top/super-coder:free",
+            "mid/decent-coder:free",
+            "slow/free-coder:free"
+        ])
+    );
+    assert_eq!(
+        cfg_val["provider"]["openrouter"]["body"]["models"],
+        json!([
+            "top/super-coder:free",
+            "mid/decent-coder:free",
+            "slow/free-coder:free"
+        ])
+    );
+
+    // Preferred override puts the requested model first, followed by remaining free models
+    let pref_cfg_str = opencode_config_for_preferred(
+        "free",
+        &models,
+        Some("mid/decent-coder:free"),
+    )
+    .unwrap();
+    let pref_val: Value = serde_json::from_str(&pref_cfg_str).unwrap();
+    assert_eq!(pref_val["model"], "openrouter/mid/decent-coder:free");
+    assert_eq!(
+        pref_val["fallback_models"],
+        json!([
+            "openrouter/top/super-coder:free",
+            "openrouter/slow/free-coder:free"
+        ])
+    );
+}
+
+#[test]
+fn benchmark_metadata_roundtrip() {
+    let original = vec![Model {
+        id: "test/bench-model:free".into(),
+        name: "Benchmark Model".into(),
+        context: 128_000,
+        input: Some(0.0),
+        output: Some(0.0),
+        cache_read: None,
+        coding_index: Some(42.5),
+        agentic_index: Some(18.2),
+        intelligence_index: Some(22.1),
+        elo: Some(1185.0),
+    }];
+
+    let json_val = models_json(12345, &original);
+    let parsed = parse_models(&json_val);
+    assert_eq!(parsed, original);
 }

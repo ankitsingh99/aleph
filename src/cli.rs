@@ -955,10 +955,16 @@ pub fn parse_new(rest: &[String], cfg: &Config) -> Result<NewArgs, String> {
                 i += 1;
             }
             // an OpenRouter model, passed the agent's own way (`--model` is
-            // the agent's own flag, passed through as it always was)
+            // the agent's own flag, passed through as it always was).
+            // `--openrouter` alone or `--openrouter free` resolves to the best free model.
             "--openrouter" => {
-                openrouter = Some(need(i, a)?);
-                i += 1;
+                let next = rest.get(i + 1);
+                if next.is_none() || next.is_some_and(|s| s.starts_with('-')) {
+                    openrouter = Some("free".to_string());
+                } else {
+                    openrouter = Some(need(i, a)?);
+                    i += 1;
+                }
             }
             x if x.starts_with("--openrouter=") => {
                 openrouter = Some(x["--openrouter=".len()..].to_string())
@@ -1004,16 +1010,25 @@ pub fn parse_new(rest: &[String], cfg: &Config) -> Result<NewArgs, String> {
         v.extend(extra);
         extra = v;
     }
-    // `--openrouter qwen/qwen3-coder`: the agent's own way of taking it, first
-    if let Some(m) = &openrouter {
-        match crate::openrouter::model_args(&o.agent, m) {
+    // `--openrouter qwen/qwen3-coder` (or `--openrouter free`): the agent's own way of taking it, first
+    let openrouter = if let Some(m) = openrouter {
+        let m_resolved = if m == "free" || m == "openrouter/free" {
+            let list = crate::openrouter::models_cached()
+                .map(|(_, v)| v)
+                .or_else(|| crate::openrouter::models().ok())
+                .unwrap_or_default();
+            crate::openrouter::resolve_model(&m, &list)
+        } else {
+            m
+        };
+        match crate::openrouter::model_args(&o.agent, &m_resolved) {
             Some(mut a) => {
                 a.extend(extra);
                 extra = a;
             }
             None if crate::openrouter::takes_model(&o.agent) => {
                 return Err(format!(
-                    "--openrouter {m}: a model id is provider/model, no spaces (aleph new --openrouter qwen/qwen3-coder)"
+                    "--openrouter {m_resolved}: a model id is provider/model, no spaces (aleph new --openrouter qwen/qwen3-coder)"
                 ))
             }
             None => {
@@ -1024,7 +1039,10 @@ pub fn parse_new(rest: &[String], cfg: &Config) -> Result<NewArgs, String> {
                 ))
             }
         }
-    }
+        Some(m_resolved)
+    } else {
+        None
+    };
     o.args = extra;
     Ok(NewArgs {
         opts: o,
@@ -1143,15 +1161,17 @@ pub fn new(a: Args) -> ExitCode {
     // won't go along
     if let Some(m) = &na.openrouter {
         let id = m.trim_start_matches("openrouter/");
-        if let Some((_, all)) = crate::openrouter::models_cached().filter(|x| !x.1.is_empty()) {
-            if !all.iter().any(|x| x.id == id) {
-                let near = crate::openrouter::search(&all, id);
-                match near.first() {
-                    Some(x) => warn(&format!(
-                        "{id} isn't in OpenRouter's model list — did you mean {}?",
-                        x.id
-                    )),
-                    None => warn(&format!("{id} isn't in OpenRouter's model list")),
+        if id != "free" {
+            if let Some((_, all)) = crate::openrouter::models_cached().filter(|x| !x.1.is_empty()) {
+                if !all.iter().any(|x| x.id == id) {
+                    let near = crate::openrouter::search(&all, id);
+                    match near.first() {
+                        Some(x) => warn(&format!(
+                            "{id} isn't in OpenRouter's model list — did you mean {}?",
+                            x.id
+                        )),
+                        None => warn(&format!("{id} isn't in OpenRouter's model list")),
+                    }
                 }
             }
         }

@@ -843,12 +843,21 @@ impl NewForm {
     /// ones `openrouter.models` lets through.
     fn model_matches(&self, n: usize) -> Vec<crate::openrouter::Model> {
         match self.models.get() {
-            Some(Ok(v)) => crate::openrouter::search(&v, &self.model.text)
-                .into_iter()
-                .filter(|m| self.or_ok(m))
-                .take(n)
-                .cloned()
-                .collect(),
+            Some(Ok(v)) => {
+                if self.or_models == "free" && self.model.text.trim().is_empty() {
+                    crate::openrouter::free_models_by_performance(&v)
+                        .into_iter()
+                        .take(n)
+                        .collect()
+                } else {
+                    crate::openrouter::search(&v, &self.model.text)
+                        .into_iter()
+                        .filter(|m| self.or_ok(m))
+                        .take(n)
+                        .cloned()
+                        .collect()
+                }
+            }
             _ => vec![],
         }
     }
@@ -871,7 +880,17 @@ impl NewForm {
     /// The model to start on (None: the agent's own).
     pub fn chosen_model(&self) -> Option<String> {
         let m = self.model.text.trim();
-        (self.has_model() && !m.is_empty()).then(|| m.to_string())
+        if !self.has_model() || m.is_empty() {
+            return None;
+        }
+        if m == "free" || m == "openrouter/free" {
+            if let Some(Ok(v)) = self.models.get() {
+                if let Some(best) = crate::openrouter::best_free_model(&v) {
+                    return Some(best.id);
+                }
+            }
+        }
+        Some(m.to_string())
     }
     /// Use this watch (the dashboard's) for "is the agent installed there".
     pub fn set_watch(&mut self, w: AgentWatch) {
